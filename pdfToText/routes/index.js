@@ -2,8 +2,7 @@ import express from "express";
 const router = express.Router();
 
 import { getSummary } from "../service/getsummary.js";
-import { processDocx, processImage, processPdf } from "../service/processfile.js";
-
+import {  processDocx, processImage, processPdf } from "../service/processfile.js";
 
 
 router.post('/processfile', async(req, res) => {
@@ -16,13 +15,13 @@ router.post('/processfile', async(req, res) => {
       break;
     case 'doc':
     case 'docx':
-      var text=processDocx(file)
+      var text=await processDocx(file)
       res.status(200).send({ success: true,text});
       break;
     case 'jpeg':
     case 'jpg':
     case 'png':
-     var text= processImage(file)
+      var text= await processImage(file)
       res.status(200).send({ success: true,text });
       break;
     default:
@@ -33,17 +32,16 @@ router.post('/processfile', async(req, res) => {
 });
 
 
-router.post('/summary', (req, res) => {
+router.post('/summary', async (req, res) => {
   const { text } = req.body;
-  console.log(text)
-
-  getSummary(text, (err, summary) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Something went wrong' });
-    }
-
+  console.log(text,"TEXT")
+  try {
+    const summaryResponse = await getSummary(text);
+    const summary = summaryResponse.data.choices[0].text;
     res.json({ summary });
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
 });
 export default router;

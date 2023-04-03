@@ -10,10 +10,10 @@ export const getSummary = async (text) => {
     }, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer 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"
+        "Authorization": "Bearer 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"
       }
     });
-    return response.send(200).json({status:true})
+    return response;
   } catch (err) {
     console.log('error ' + err);
   }
