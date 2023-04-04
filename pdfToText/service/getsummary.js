@@ -10,7 +10,7 @@ export const getSummary = async (text) => {
     }, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer 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"
+        "Authorization": "Bearer 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"
       }
     });
     return response;

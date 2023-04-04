@@ -3,12 +3,19 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const  pdfjspkg =require('pdfjs-dist');
 const { getDocument } = pdfjspkg;
-// const pizzpkg=require("pizzip")
+import docxpkg from 'docx'
+const { Packer, Document } =docxpkg;
 const canvaspkg = require('canvas')
 const { createCanvas, loadImage }=canvaspkg
-const docxtemplaterpkg=require("docxtemplater")
-import PizZipUtils from 'pizzip/utils/index.js';
-import PizZip from "pizzip";
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
+import superagent from 'superagent';
+import axios from "axios";
+var toArrayBuffer = require('to-array-buffer')
+const StreamZip = require('node-stream-zip');
+const WordExtractor = require("word-extractor"); 
+const extractor = new WordExtractor();
+var textract = require('textract');
 
 
 
@@ -38,27 +45,95 @@ export const processPdf = async (pdfUrl) => {
   }
 };
 
-
-
-export function loadFile(url,callback){
-  console.log(url,"###############")
-
-  PizZipUtils.getBinaryContent(url,callback);
+export function loadFile(url, callback) {
+  superagent.get(url).responseType('arraybuffer').end((err, res) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    callback(null, res.body);
+  });
 }
 
-export const processDocx = async (docxUrl) => {
+const loadfile = async (url) => {
+  const response = await fetch(url);
+  console.log(response.headers.get('Content-Type'))
+  const data = await response.arrayBuffer();
+  console.log(data,'Data Buffer')
+  return data;
+}
+
+export const processfile = async (docxUrl) => {
+  console.log(docxUrl,"#############")
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: docxUrl,
+      responseType: 'arraybuffer'
+    });
+console.log(response);
+    const zip = new StreamZip({
+      storeEntries: true,
+      zlib: { level: 1 }
+    });
+    zip.on('error', function(err) {
+      console.error(err);
+    });
+
+    zip.on('ready', function() {
+      const docBuffer = zip.entryDataSync('word/document.xml');
+      const doc = new docxpkg.Document(docBuffer);
+      const text = doc.getText();
+      console.log(text);
+      zip.close();
+    });
+
+    zip.load(response.data);
+  } catch (error) {
+    console.error(error);
+  }
+    // const content = await loadfile(docxUrl);
+    // const zip = new PizZip(content);
+    // console.log(zip,"!!!!!!!!!!!!!!!!!")
+    // const doc = new window.docxtemplater(zip);
+    // console.log(doc, "doc")
+    // const text = doc.getFullText();
+
+    // const extracted = extractor.extract(docxUrl);
+
+    // extracted.then(function(doc) { console.log(doc.getBody(), 'extracted body'); });
+    // textract.fromUrl(docxUrl, function( error, text ) {
+    //   console.log(error, text, "textract response");
+    // })
+    // getSummary(text)
+  // } catch (error) {
+  //   console.error(error);
+  // }
+};
+
+
+
+export async function processDocx(docxUrl) {
   try {
     console.log('processDocx');
-    const content = loadFile(docxUrl);
-    console.log(content);
+    const content = await new Promise((resolve, reject) => {
+      loadFile(docxUrl, (err, data) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(toArrayBuffer(data));
+        }
+      });
+    });
+    console.log(content,"@@@@@@@@@@@@")
     const zip = new PizZip(content);
-    const doc = new window.docxtemplaterpkg(zip);
+    const doc = new Docxtemplater(zip);
     const text = doc.getFullText();
-    return text
+    return text;
   } catch (err) {
     console.log('error ' + err);
   }
-};
+}
 
 export const convertImageToBase64Async = (imgUrl) => {
   console.log(imgUrl,"#########")
