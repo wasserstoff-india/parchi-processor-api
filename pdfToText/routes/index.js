@@ -2,7 +2,8 @@ import express from "express";
 const router = express.Router();
 
 import { getSummary } from "../service/getsummary.js";
-import { processfile,processDocx, processImage, processPdf } from "../service/processfile.js";
+import { processDocx, processImage, processPdf } from "../service/processfile.js";
+import { saveEmail } from "../service/Email.js";
 
 
 router.post('/processfile', async(req, res) => {
@@ -13,11 +14,7 @@ router.post('/processfile', async(req, res) => {
       var text=await processPdf(file)
       res.status(200).send({ success: true ,text});
       break;
-      case 'doc': 
-      console.log(file, "fileUrl")
-      var text=await processfile(file)
-      res.status(200).send({ success: true ,text});
-      break;
+    case "doc":
     case 'docx':
       var text=await processDocx(file)
       res.status(200).send({ success: true,text});
@@ -42,6 +39,7 @@ router.post('/summary', async (req, res) => {
   try {
     const summaryResponse = await getSummary(text);
     const summary = await summaryResponse.data.choices[0].text;
+    await saveEmail(req, res);
     console.log(summary)
     res.json({ summary });
   } catch (err) {

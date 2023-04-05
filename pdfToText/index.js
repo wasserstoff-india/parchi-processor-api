@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import { PORT } from "./config/config.js";
 import router from "./routes/index.js";
+import db from "./config/mongoose.js";
 
 const app = express();
 app.use(bodyParser.json())

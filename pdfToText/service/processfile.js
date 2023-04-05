@@ -55,63 +55,6 @@ export function loadFile(url, callback) {
   });
 }
 
-const loadfile = async (url) => {
-  const response = await fetch(url);
-  console.log(response.headers.get('Content-Type'))
-  const data = await response.arrayBuffer();
-  console.log(data,'Data Buffer')
-  return data;
-}
-
-export const processfile = async (docxUrl) => {
-  console.log(docxUrl,"#############")
-  try {
-    const response = await axios({
-      method: 'GET',
-      url: docxUrl,
-      responseType: 'arraybuffer'
-    });
-console.log(response);
-    const zip = new StreamZip({
-      storeEntries: true,
-      zlib: { level: 1 }
-    });
-    zip.on('error', function(err) {
-      console.error(err);
-    });
-
-    zip.on('ready', function() {
-      const docBuffer = zip.entryDataSync('word/document.xml');
-      const doc = new docxpkg.Document(docBuffer);
-      const text = doc.getText();
-      console.log(text);
-      zip.close();
-    });
-
-    zip.load(response.data);
-  } catch (error) {
-    console.error(error);
-  }
-    // const content = await loadfile(docxUrl);
-    // const zip = new PizZip(content);
-    // console.log(zip,"!!!!!!!!!!!!!!!!!")
-    // const doc = new window.docxtemplater(zip);
-    // console.log(doc, "doc")
-    // const text = doc.getFullText();
-
-    // const extracted = extractor.extract(docxUrl);
-
-    // extracted.then(function(doc) { console.log(doc.getBody(), 'extracted body'); });
-    // textract.fromUrl(docxUrl, function( error, text ) {
-    //   console.log(error, text, "textract response");
-    // })
-    // getSummary(text)
-  // } catch (error) {
-  //   console.error(error);
-  // }
-};
-
-
 
 export async function processDocx(docxUrl) {
   try {
@@ -134,6 +77,87 @@ export async function processDocx(docxUrl) {
     console.log('error ' + err);
   }
 }
+
+// const loadfile = async (url) => {
+//   const response = await fetch(url);
+//   console.log(response.headers.get('Content-Type'))
+//   const data = await response.arrayBuffer();
+//   console.log(data,'Data Buffer')
+//   return data;
+// }
+
+
+
+
+
+
+// invalid argument type of docs url or the 
+// export const processfile = async (docxUrl) => {
+//   console.log(docxUrl,"#############")
+//   try {
+//     axios.get(docxUrl, { responseType: 'arraybuffer' })
+//   .then((response) => {
+//     const buffer = Buffer.from(response.data);
+
+//     textract.fromBufferWithMime('application/msword', buffer, (error, text) => {
+//       if (error) {
+//         console.error(error);
+//         return;
+//       }
+
+//       console.log(text);
+//     });
+//   })
+//   .catch((error) => {
+//     console.error(error);
+//   });
+//     const response = await axios({
+//       method: 'GET',
+//       url: docxUrl,
+//       responseType: 'arraybuffer'
+//     });
+// console.log(response);
+//     const zip = new StreamZip({
+//       storeEntries: true,
+//       zlib: { level: 1 }
+//     });
+//     zip.on('error', function(err) {
+//       console.error(err);
+//     });
+
+//     zip.on('ready', function() {
+//       const docBuffer = zip.entryDataSync('word/document.xml');
+//       const doc = new docxpkg.Document(docBuffer);
+//       const text = doc.getText();
+//       console.log(text);
+//       zip.close();
+//     });
+
+//     zip.load(response.data);
+  // } catch (error) {
+  //   console.error(error);
+  // }
+    // const content = await loadfile(docxUrl);
+    // const zip = new PizZip(content);
+    // console.log(zip,"!!!!!!!!!!!!!!!!!")
+    // const doc = new window.docxtemplater(zip);
+    // console.log(doc, "doc")
+    // const text = doc.getFullText();
+
+    // const extracted = extractor.extract(docxUrl);
+
+    // extracted.then(function(doc) { console.log(doc.getBody(), 'extracted body'); });
+    // textract.fromUrl(docxUrl, function( error, text ) {
+    //   console.log(error, text, "textract response");
+    // })
+    // getSummary(text)
+  // } catch (error) {
+  //   console.error(error);
+  // }
+// };
+
+
+
 
 export const convertImageToBase64Async = (imgUrl) => {
   console.log(imgUrl,"#########")

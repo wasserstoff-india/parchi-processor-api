@@ -1,6 +1,6 @@
 import axios from "axios"
 
-export const getSummary = async (text) => {
+export const getSummary = async (text,) => {
   try {
     const response = await axios.post('https://api.openai.com/v1/completions', {
       "model": "text-davinci-003",
@@ -10,12 +10,12 @@ export const getSummary = async (text) => {
     }, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer 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"
+        "Authorization": "Bearer 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"
       }
     });
     return response;
   } catch (err) {
-    console.log('error ' + err);
+    console.log('error IN GPT ' + err);
   }
 };
 
