@@ -4,26 +4,24 @@ const require = createRequire(import.meta.url);
 const  pdfjspkg =require('pdfjs-dist');
 const { getDocument } = pdfjspkg;
 import docxpkg from 'docx'
-const { Packer, Document } =docxpkg;
 const canvaspkg = require('canvas')
 const { createCanvas, loadImage }=canvaspkg
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import superagent from 'superagent';
-import axios from "axios";
+import { Authorization, VISION_API } from "../config/config.js";
 var toArrayBuffer = require('to-array-buffer')
-const StreamZip = require('node-stream-zip');
-const WordExtractor = require("word-extractor"); 
-const extractor = new WordExtractor();
-var textract = require('textract');
+// const StreamZip = require('node-stream-zip');
+// const WordExtractor = require("word-extractor"); 
+// const extractor = new WordExtractor();
+// var textract = require('textract');
+// const { Packer, Document } =docxpkg;
 
 
 
 export const getpdf2text = async (pdfUrl) => {
   const pdf = await getDocument(pdfUrl).promise;
-  // console.log(pdf, "pdf")
   var numPages = pdf.numPages;
-  // console.log(numPages, "numPages")
   var finalString = '';    
   for(var i = 1; i <= numPages; i++){
     const page = await pdf.getPage(i);
@@ -160,7 +158,6 @@ export async function processDocx(docxUrl) {
 
 
 export const convertImageToBase64Async = (imgUrl) => {
-  console.log(imgUrl,"#########")
   return new Promise(resolve => convertImageToBase64(imgUrl, resolve))
 } 
 
@@ -177,11 +174,11 @@ export const convertImageToBase64 = async (imgUrl, cb) => {
 export const processImage = async (imageUrl) => {
   try {
     let base64 = (await convertImageToBase64Async(imageUrl)).replace(/^data:image\/(png|jpg);base64,/, "");
-    const response = await fetch('https://vision.googleapis.com/v1/images:annotate', {
+    const response = await fetch(VISION_API, {
       method: 'POST',
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer ya29.a0Ael9sCMXMpOIVj_EsVNmBUmsJjey1qs41CRHBtZt5_VeAkwOOFOX7UxsGst73JNiCvg5O0FcjeXUd6LGtEK6aECSGEwXg8c65jRcogFbVDWYyCzY2SjWstD2FICQHFWSHiW87Ya1EzIAVfj9Mw9GSpag-6iV5eTGRUraBgaCgYKAagSARESFQF4udJhKYVN7pVYg7cgr4hx1qrLQw0173",
+        "Authorization":Authorization,
         "x-goog-user-project": "text2image-380917"
       },
       body: JSON.stringify({

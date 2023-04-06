@@ -1,4 +1,5 @@
 import axios from "axios"
+import { SUMMARY_URL } from "../config/config.js";
 
 export const getSummary = async (text,) => {
   try {
@@ -10,7 +11,7 @@ export const getSummary = async (text,) => {
     }, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer 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"
+        "Authorization": "Bearer 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"
       }
     });
     return response;

@@ -6,12 +6,18 @@ export const saveEmail = async (req, res) => {
   try {
     const { email } = req.body; 
     console.log(email,"###########");
-    const newEmail = await Email.create({
+    await Email.create({
       email: email,
     });
-    return res.status(200);
+    return true;
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Failed to save email to database.' });
+    return false;
   }
 }
+
+
+
+
+
+
