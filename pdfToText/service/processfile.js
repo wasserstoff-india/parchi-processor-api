@@ -1,9 +1,7 @@
 import { createRequire } from "module";
-
 const require = createRequire(import.meta.url);
 const  pdfjspkg =require('pdfjs-dist');
 const { getDocument } = pdfjspkg;
-import docxpkg from 'docx'
 const canvaspkg = require('canvas')
 const { createCanvas, loadImage }=canvaspkg
 import Docxtemplater from 'docxtemplater';
@@ -11,27 +9,27 @@ import PizZip from 'pizzip';
 import superagent from 'superagent';
 import { Authorization, VISION_API } from "../config/config.js";
 var toArrayBuffer = require('to-array-buffer')
-// const StreamZip = require('node-stream-zip');
-// const WordExtractor = require("word-extractor"); 
-// const extractor = new WordExtractor();
-// var textract = require('textract');
-// const { Packer, Document } =docxpkg;
+import axios from "axios";
+const xlsx = require('xlsx');
 
 
 
 export const getpdf2text = async (pdfUrl) => {
-  const pdf = await getDocument(pdfUrl).promise;
-  var numPages = pdf.numPages;
-  var finalString = '';    
-  for(var i = 1; i <= numPages; i++){
-    const page = await pdf.getPage(i);
-    console.log(page, "page 1")
-    const pageTextContent = await page.getTextContent();
-    console.log(pageTextContent, "pageTextContent")
-    const pageText = pageTextContent.items.map(item => item.str!='' ? item.str : '\n').join(' ');
-    finalString += pageText + '\n\n';
+  try {
+    const pdf = await getDocument(pdfUrl).promise;
+    var numPages = pdf.numPages;
+    var finalString = '';    
+    for(var i = 1; i <= numPages; i++){
+      const page = await pdf.getPage(i);
+      const pageTextContent = await page.getTextContent();
+      const pageText = pageTextContent.items.map(item => item.str!='' ? item.str : '\n').join(' ');
+      finalString += pageText + '\n\n';
+    }
+    return finalString;
+  } catch (error) {
+    console.log('error', error);
   }
-  return finalString;
+ 
 }
 
 
@@ -44,13 +42,18 @@ export const processPdf = async (pdfUrl) => {
 };
 
 export function loadFile(url, callback) {
-  superagent.get(url).responseType('arraybuffer').end((err, res) => {
-    if (err) {
-      callback(err);
-      return;
-    }
-    callback(null, res.body);
-  });
+  try {
+    superagent.get(url).responseType('arraybuffer').end((err, res) => {
+      if (err) {
+        callback(err);
+        return;
+      }
+      callback(null, res.body);
+    });
+  } catch (error) {
+    console.log('error', error);
+  }
+  
 }
 
 
@@ -66,7 +69,6 @@ export async function processDocx(docxUrl) {
         }
       });
     });
-    console.log(content,"@@@@@@@@@@@@")
     const zip = new PizZip(content);
     const doc = new Docxtemplater(zip);
     const text = doc.getFullText();
@@ -76,86 +78,27 @@ export async function processDocx(docxUrl) {
   }
 }
 
-// const loadfile = async (url) => {
-//   const response = await fetch(url);
-//   console.log(response.headers.get('Content-Type'))
-//   const data = await response.arrayBuffer();
-//   console.log(data,'Data Buffer')
-//   return data;
-// }
 
 
-
-
-
-
-// invalid argument type of docs url or the 
-// export const processfile = async (docxUrl) => {
-//   console.log(docxUrl,"#############")
-//   try {
-//     axios.get(docxUrl, { responseType: 'arraybuffer' })
-//   .then((response) => {
-//     const buffer = Buffer.from(response.data);
-
-//     textract.fromBufferWithMime('application/msword', buffer, (error, text) => {
-//       if (error) {
-//         console.error(error);
-//         return;
-//       }
-
-//       console.log(text);
-//     });
-//   })
-//   .catch((error) => {
-//     console.error(error);
-//   });
-//     const response = await axios({
-//       method: 'GET',
-//       url: docxUrl,
-//       responseType: 'arraybuffer'
-//     });
-// console.log(response);
-//     const zip = new StreamZip({
-//       storeEntries: true,
-//       zlib: { level: 1 }
-//     });
-//     zip.on('error', function(err) {
-//       console.error(err);
-//     });
-
-//     zip.on('ready', function() {
-//       const docBuffer = zip.entryDataSync('word/document.xml');
-//       const doc = new docxpkg.Document(docBuffer);
-//       const text = doc.getText();
-//       console.log(text);
-//       zip.close();
-//     });
-
-//     zip.load(response.data);
-  // } catch (error) {
-  //   console.error(error);
-  // }
-    // const content = await loadfile(docxUrl);
-    // const zip = new PizZip(content);
-    // console.log(zip,"!!!!!!!!!!!!!!!!!")
-    // const doc = new window.docxtemplater(zip);
-    // console.log(doc, "doc")
-    // const text = doc.getFullText();
-
-    // const extracted = extractor.extract(docxUrl);
-
-    // extracted.then(function(doc) { console.log(doc.getBody(), 'extracted body'); });
-    // textract.fromUrl(docxUrl, function( error, text ) {
-    //   console.log(error, text, "textract response");
-    // })
-    // getSummary(text)
-  // } catch (error) {
-  //   console.error(error);
-  // }
-// };
-
-
-
+export const processXlsx=async(xlsxUrl)=> {
+  console.log(xlsxUrl,"kkkkkkkk")
+  try {
+    const response = await axios.get(xlsxUrl, {
+      responseType: 'arraybuffer',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }
+    });
+    const workbook = xlsx.read(response.data, { type: 'buffer' }); 
+    const sheetName = workbook.SheetNames[0]; 
+    const worksheet = workbook.Sheets[sheetName]; 
+    const csvText = xlsx.utils.sheet_to_csv(worksheet);
+    const text = csvText.replace(/,/g, ' '); 
+    return text;
+  } catch (err) {
+    console.log('error ' + err);
+  }
+}
 
 export const convertImageToBase64Async = (imgUrl) => {
   return new Promise(resolve => convertImageToBase64(imgUrl, resolve))
@@ -163,13 +106,18 @@ export const convertImageToBase64Async = (imgUrl) => {
 
 
 export const convertImageToBase64 = async (imgUrl, cb) => {
+ try {
   const img = await loadImage(imgUrl);
   const canvas = createCanvas(img.width, img.height);
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
+   ctx.drawImage(img, 0, 0);
   const dataUrl = canvas.toDataURL();
   cb(dataUrl);
   return dataUrl;
+} catch (error) {
+  console.log('error', error);
+ }
+  
 }
 export const processImage = async (imageUrl) => {
   try {
@@ -197,9 +145,7 @@ export const processImage = async (imageUrl) => {
       })
     });
     const data = await response.json();
-    console.log(data)
     const text = data.responses[0].fullTextAnnotation.text;
-    console.log(text)
    return text
   } catch (error) {
     console.log('error', error);

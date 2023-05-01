@@ -15,6 +15,7 @@
     "axios": "^1.3.4",
     "canvas": "^2.11.2",
     "cors": "^2.8.5",
+    "csv-parser": "^3.0.0",
     "docx": "^8.0.1",
     "docxtemplater": "^3.36.1",
     "dotenv": "^16.0.3",
@@ -29,7 +30,8 @@
     "pizzip": "^3.1.4",
     "superagent": "^8.0.9",
     "textract": "^2.5.0",
-    "word-extractor": "^1.0.4"
+    "word-extractor": "^1.0.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/office-js": "^1.0.318",
