@@ -1,9 +1,10 @@
 import express from "express";
 const router = express.Router();
-import { DownloadSummay, ProcessFile, Summary } from "../Controller/Controller.js";
+import {  ProcessFile } from "../Controller/ProcessController.js";
+import { DownloadSummay, getSummary } from "../service/getsummary.js";
 
 
 router.post('/processfile', ProcessFile)
-router.post('/summary',Summary);
+router.post('/summary',getSummary);
 router.get('/download-summary',DownloadSummay);
 export default router
