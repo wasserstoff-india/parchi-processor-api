@@ -1,11 +1,11 @@
 import axios from "axios"
-import { SUMMARY_URL } from "../config/config.js";
+import { Authorization, SUMMARY_URL } from "../config/config.js";
 import { saveEmail } from "../service/Email.js";
 
 
 export const getSummary = async (text,) => {
   try {
-    const response = await axios.post('https://api.openai.com/v1/completions', {
+    const response = await axios.post(SUMMARY_URL, {
       "model": "text-davinci-003",
       "prompt": "Summarise the following text : " + text + "\n\n",
       "max_tokens": 1024,
@@ -13,7 +13,7 @@ export const getSummary = async (text,) => {
     }, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer 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"
+        "Authorization": Authorization
       }
     });
     return response;
