@@ -7,7 +7,7 @@ const { createCanvas, loadImage }=canvaspkg
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import superagent from 'superagent';
-import { Authorization, VISION_API } from "../config/config.js";
+import { AUTHRIZATION, VISION_API } from "../config/config.js";
 var toArrayBuffer = require('to-array-buffer')
 import axios from "axios";
 const xlsx = require('xlsx');
@@ -72,6 +72,7 @@ export async function processDocx(docxUrl) {
     const zip = new PizZip(content);
     const doc = new Docxtemplater(zip);
     const text = doc.getFullText();
+    console.log(text,":::text")
     return text;
   } catch (err) {
     console.log('error ' + err);
@@ -126,7 +127,7 @@ export const processImage = async (imageUrl) => {
       method: 'POST',
       headers: {
         "Content-Type": "application/json",
-        "Authorization":Authorization,
+        "Authorization":AUTHRIZATION,
         "x-goog-user-project": "text2image-380917"
       },
       body: JSON.stringify({
