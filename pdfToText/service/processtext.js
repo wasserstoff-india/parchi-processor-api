@@ -7,7 +7,7 @@ const { createCanvas, loadImage }=canvaspkg
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
 import superagent from 'superagent';
-import { AUTHRIZATION, VISION_API } from "../config/config.js";
+import { VISIONKEY,VISION_API } from "../config/config.js";
 var toArrayBuffer = require('to-array-buffer')
 import axios from "axios";
 const xlsx = require('xlsx');
@@ -121,13 +121,16 @@ export const convertImageToBase64 = async (imgUrl, cb) => {
   
 }
 export const processImage = async (imageUrl) => {
+  console.log(imageUrl,"::imageurl  ")
   try {
     let base64 = (await convertImageToBase64Async(imageUrl)).replace(/^data:image\/(png|jpg);base64,/, "");
+    // console.log(base64,":::base64")
+    console.log(VISION_API,":::VISIONAPI")
     const response = await fetch(VISION_API, {
       method: 'POST',
       headers: {
         "Content-Type": "application/json",
-        "Authorization":AUTHRIZATION,
+        "Authorization": "Bearer " + VISIONKEY,
         "x-goog-user-project": "text2image-380917"
       },
       body: JSON.stringify({

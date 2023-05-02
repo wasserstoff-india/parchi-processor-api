@@ -1,5 +1,5 @@
 import axios from "axios"
-import { AUTHRIZATION, SUMMARY_URL } from "../config/config.js";
+import { CHATAPI, SUMMARY_URL } from "../config/config.js";
 import { saveEmail } from "../service/Email.js";
 
 
@@ -16,7 +16,7 @@ export const getSummary = async (text) => {
     }, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": AUTHRIZATION
+        "Authorization":"Bearer " + CHATAPI
       }
     });
     return response;
