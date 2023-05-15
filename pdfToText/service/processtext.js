@@ -72,7 +72,7 @@ export async function processDocx(docxUrl) {
     const zip = new PizZip(content);
     const doc = new Docxtemplater(zip);
     const text = doc.getFullText();
-    console.log(text,":::text")
+    
     return text;
   } catch (err) {
     console.log('error ' + err);
@@ -90,11 +90,13 @@ export const processXlsx=async(xlsxUrl)=> {
         Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       }
     });
+    
     const workbook = xlsx.read(response.data, { type: 'buffer' }); 
     const sheetName = workbook.SheetNames[0]; 
     const worksheet = workbook.Sheets[sheetName]; 
     const csvText = xlsx.utils.sheet_to_csv(worksheet);
     const text = csvText.replace(/,/g, ' '); 
+    // console.log(text,"::::text")
     return text;
   } catch (err) {
     console.log('error ' + err);
