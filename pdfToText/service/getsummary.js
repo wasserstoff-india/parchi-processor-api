@@ -1,42 +1,59 @@
 import axios from 'axios';
-import { CHATAPI, SUMMARY_URL } from '../config/config.js';
+
 import { saveEmail } from '../service/Email.js';
 
+import { CHATAPI } from '../config/config.js';
+import { OpenAIApi, Configuration } from 'openai';
+const conf = new Configuration({
+  apiKey: `${CHATAPI}`,
+});
+const openai = new OpenAIApi(conf);
 export const getSummary = async (text) => {
-  try {
-    console.log(text, '::::::summarytext');
-    // console.log(SUMMARY_URL,":::::: summary url")
-    // console.log(AUTHRIZATION, "::::: authorization")
-    const response = await axios.post(
-      SUMMARY_URL,
-      {
-        model: 'text-davinci-003',
-        prompt: 'Summarise the following text : ' + text + '\n\n',
-        max_tokens: 1024,
-        temperature: 0,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + CHATAPI,
-        },
-      }
-    );
-    return response;
-  } catch (err) {
-    console.log('Error in getSummaruy');
-    // console.log('error IN GPT ' + err);
-  }
+  // console.log(await openai.retrieveModel(MODEL_ID))
+  const response = await openai.createCompletion({
+    model: 'text-davinci-003',
+    prompt: 'Summarise the following text : ' + text + '\n\n',
+    max_tokens: 1000,
+    temperature: 0,
+    frequency_penalty: 2,
+    stop: '\n',
+  });
+  console.log(response.data.choices);
+  return response;
 };
+// try {
+//   console.log(text, '::::::summarytext');
+//   // console.log(SUMMARY_URL,":::::: summary url")
+//   // console.log(AUTHRIZATION, "::::: authorization")
+//   const response = await axios.post(
+//     SUMMARY_URL,
+//     {
+//       model: 'text-davinci-003',
+//       prompt: 'Summarise the following text : ' + text + '\n\n',
+//       max_tokens: 1024,
+//       temperature: 0,
+//     },
+//     {
+//       headers: {
+//         'Content-Type': 'application/json',
+//         Authorization: 'Bearer ' + CHATAPI,
+//       },
+//     }
+//   );
+//   return response;
+// } catch (err) {
+//   console.log('Error in getSummaruy');
+//   // console.log('error IN GPT ' + err);
+// }
 
 export const Summary = async (req, res) => {
   console.log(req.body, ':::::body');
   const text = req.body.text;
-  console.log(text, 'TEXT');
+
   try {
     const summaryResponse = await getSummary(text);
-    console.log(summaryResponse, ':::::summaryResponse');
-    const summary = await summaryResponse.data.choices[0].text;
+    // console.log(summaryResponse, ':::::summaryResponse');
+    const summary = summaryResponse.data.choices[0].text;
 
     const { userId, message } = req.body;
     const botMessage = {
@@ -44,11 +61,12 @@ export const Summary = async (req, res) => {
       content: summary,
     };
 
-    await Chats.updateChatSession(userId, message, botMessage, summary);
+    // await updateChatSession(userId, message, botMessage, summary);
 
-    const emailSaved = await saveEmail(req, res);
+    const emailSaved = await saveEmail(req.body.email);
+
     if (emailSaved) {
-      console.log(summary);
+      // console.log(summary);
       res.json({ summary });
     } else {
       res.status(500).json({ error: 'Failed to save email to database.' });

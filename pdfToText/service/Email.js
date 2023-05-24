@@ -1,11 +1,8 @@
-import Email from "../modal/Email.js";
+import Email from '../modal/Email.js';
 
-
-
-export const saveEmail = async (req, res) => {
+export const saveEmail = async (email) => {
   try {
-    const { email } = req.body; 
-    console.log(email,"###########");
+    console.log(email, '###########');
     await Email.create({
       email: email,
     });
@@ -14,10 +11,4 @@ export const saveEmail = async (req, res) => {
     console.error(err);
     return false;
   }
-}
-
-
-
-
-
-
+};
