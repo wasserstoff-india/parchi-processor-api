@@ -1,14 +1,17 @@
-import Email from '../modal/Email.js';
+import Email from '../model/Email.js';
 
-export const saveEmail = async (email) => {
+export const saveEmail = async (waId, name) => {
   try {
-    console.log(email, '###########');
-    await Email.create({
-      email: email,
-    });
-    return true;
+    let findemail = await Email.findOne({ waId: waId, name: name });
+    if (!findemail) {
+      findemail = await Email.create({
+        waId: waId,
+        name: name,
+      });
+    }
+    return findemail;
   } catch (err) {
     console.error(err);
-    return false;
+    return null;
   }
 };

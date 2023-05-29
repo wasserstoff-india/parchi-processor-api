@@ -5,10 +5,6 @@ const chatSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  userId: {
-    type: String,
-    required: true,
-  },
   summary: {
     type: String,
   },
@@ -16,7 +12,7 @@ const chatSchema = new mongoose.Schema({
     {
       sender: {
         type: String,
-        enum: ['user', 'bot'],
+        enum: ['user', 'assistant'],
         required: true,
       },
       message: {
