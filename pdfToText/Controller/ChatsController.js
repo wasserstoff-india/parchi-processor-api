@@ -31,6 +31,12 @@ export const Chats = async (req, res) => {
     if (sessionId && message) {
       const chatSession = await Chat.findOne({ sessionToken: sessionId });
 
+      const msgObj = {
+        sender: 'user',
+        message: message,
+      };
+      chatSession.messages.push(msgObj);
+
       if (chatSession.messages.length >= 11) {
         chatSession.messages = [
           chatSession.messages[0],
@@ -42,7 +48,6 @@ export const Chats = async (req, res) => {
       const botMessage = await getBotResponse(chatSession.messages);
 
       await updateChatSession(chatSession._id, message, botMessage);
-      console.log(botMessage);
 
       return res.status(200).json({ chatSession, botMessage });
     }

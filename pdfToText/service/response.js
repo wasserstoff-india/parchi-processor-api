@@ -25,9 +25,7 @@ export const getBotResponse = async (message) => {
 };
 
 export const getSummary = async (text) => {
-  console.log(text, ':::::text');
   try {
-    console.log(CHATAPI);
     const response = await openai.createCompletion({
       model: 'text-davinci-003',
       prompt: 'Summarise the following text : ' + text + '\n\n',
