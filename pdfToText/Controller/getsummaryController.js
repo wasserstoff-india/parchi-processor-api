@@ -3,6 +3,7 @@ import { getSummary } from '../service/response.js';
 
 export const Summary = async (req, res) => {
   const { text, resdata } = req.body;
+  console.log(req.body, '::::body');
 
   try {
     const summaryResponse = await getSummary(text);
@@ -10,7 +11,7 @@ export const Summary = async (req, res) => {
 
     const emailSaved = await saveEmail(
       req.body.resdata.waId,
-      req.body.resdata.waProfile.names
+      req.body.resdata.waProfile.name
     );
 
     if (emailSaved) {

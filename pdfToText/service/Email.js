@@ -1,6 +1,7 @@
 import Email from '../model/Email.js';
 
 export const saveEmail = async (waId, name) => {
+  console.log(waId, name, '::::::email');
   try {
     let findemail = await Email.findOne({ waId: waId, name: name });
     if (!findemail) {
