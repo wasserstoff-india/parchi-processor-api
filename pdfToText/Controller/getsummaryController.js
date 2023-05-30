@@ -10,7 +10,7 @@ export const Summary = async (req, res) => {
 
     const emailSaved = await saveEmail(
       req.body.resdata.waId,
-      req.body.resdata.waProfile.name
+      req.body.resdata.waProfile.names
     );
 
     if (emailSaved) {
