@@ -10,7 +10,6 @@ export const getBotResponse = async (message) => {
     return { role: msg.sender, content: msg.message };
   });
   try {
-    console.log(msgsArr, ':::::: MSGARR');
     const response = await openai.createChatCompletion({
       model: 'gpt-3.5-turbo',
       messages: msgsArr,

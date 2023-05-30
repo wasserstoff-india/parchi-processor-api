@@ -58,7 +58,6 @@ export function loadFile(url, callback) {
 
 export async function processDocx(docxUrl) {
   try {
-    console.log('processDocx');
     const content = await new Promise((resolve, reject) => {
       loadFile(docxUrl, (err, data) => {
         if (err) {
@@ -79,7 +78,6 @@ export async function processDocx(docxUrl) {
 }
 
 export const processXlsx = async (xlsxUrl) => {
-  console.log(xlsxUrl, 'kkkkkkkk');
   try {
     const response = await axios.get(xlsxUrl, {
       responseType: 'arraybuffer',
@@ -94,7 +92,6 @@ export const processXlsx = async (xlsxUrl) => {
     const worksheet = workbook.Sheets[sheetName];
     const csvText = xlsx.utils.sheet_to_csv(worksheet);
     const text = csvText.replace(/,/g, ' ');
-    // console.log(text,"::::text")
     return text;
   } catch (err) {
     console.log('error ' + err);
@@ -119,14 +116,11 @@ export const convertImageToBase64 = async (imgUrl, cb) => {
   }
 };
 export const processImage = async (imageUrl) => {
-  console.log(imageUrl, '::imageurl  ');
   try {
     let base64 = (await convertImageToBase64Async(imageUrl)).replace(
       /^data:image\/(png|jpg);base64,/,
       ''
     );
-    // console.log(base64,":::base64")
-    console.log(VISION_API, ':::VISIONAPI');
     const response = await fetch(VISION_API, {
       method: 'POST',
       headers: {
