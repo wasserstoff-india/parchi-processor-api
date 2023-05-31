@@ -1,6 +1,6 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdfjspkg = require('pdfjs-dist');
+const pdfjspkg = require('pdfjs-dist/legacy/build/pdf.js');
 const { getDocument } = pdfjspkg;
 const canvaspkg = require('canvas');
 const { createCanvas, loadImage } = canvaspkg;
