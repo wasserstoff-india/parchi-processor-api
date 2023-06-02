@@ -17,7 +17,6 @@ $(document).ready(function () {
       data: form_data,
       type: 'post',
       success: function (data) {
-        console.log(data);
         const fileType = data.file.split('.').pop();
         switch (fileType) {
           case 'pdf':

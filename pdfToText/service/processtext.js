@@ -11,6 +11,7 @@ import { VISIONKEY, VISION_API } from '../config/config.js';
 var toArrayBuffer = require('to-array-buffer');
 import axios from 'axios';
 const xlsx = require('xlsx');
+import Tesseract from 'tesseract.js';
 
 export const getpdf2text = async (pdfUrl) => {
   try {
@@ -110,43 +111,81 @@ export const convertImageToBase64 = async (imgUrl, cb) => {
     ctx.drawImage(img, 0, 0);
     const dataUrl = canvas.toDataURL();
     cb(dataUrl);
+
     return dataUrl;
   } catch (error) {
     console.log('error', error);
   }
 };
+
 export const processImage = async (imageUrl) => {
   try {
-    let base64 = (await convertImageToBase64Async(imageUrl)).replace(
-      /^data:image\/(png|jpg);base64,/,
-      ''
-    );
-    const response = await fetch(VISION_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + VISIONKEY,
-        'x-goog-user-project': 'text2image-380917',
-      },
-      body: JSON.stringify({
-        requests: [
-          {
-            image: {
-              content: base64,
-            },
-            features: [
-              {
-                type: 'TEXT_DETECTION',
-              },
-            ],
-          },
-        ],
-      }),
-    });
-    const data = await response.json();
-    const text = data.responses[0].fullTextAnnotation.text;
+    const { data } = await Tesseract.recognize(encodeURI(imageUrl), 'eng');
+    const text = data.text;
     return text;
   } catch (error) {
     console.log('error', error);
   }
 };
+
+// export const processImage = async (imageUrl) => {
+//   try {
+//     console.log('console 1');
+//     let base64 = (await convertImageToBase64Async(imageUrl)).replace(
+//       /^data:image\/(png|jpg);base64,/,
+//       ''
+//     );
+
+//     // const {
+//     //   data: { text },
+//     // } = await Tesseract.recognize(base64, 'eng');
+//     // return text;
+
+//     const { data } = await Tesseract.recognize(base64, 'eng');
+//     console.log('console 2');
+//     return;
+//     console.log(data, '::::data');
+//     const text = data.text;
+//     console.log(text, ':::text');
+//     return text;
+//   } catch (error) {
+//     console.log('error', error.status);
+//   }
+// };
+
+// export const processImage = async (imageUrl) => {
+//   console.log(VISIONKEY, '::::visiojnkey');
+//   try {
+//     let base64 = (await convertImageToBase64Async(imageUrl)).replace(
+//       /^data:image\/(png|jpg);base64,/,
+//       ''
+//     );
+
+//     const response = await axios.post(VISION_API, {
+//       headers: {
+//         'Content-Type': 'application/json',
+//         Authorization: 'Bearer ' + VISIONKEY,
+//         'x-goog-user-project': 'text2image-380917',
+//       },
+//       body: JSON.stringify({
+//         requests: [
+//           {
+//             image: {
+//               content: base64,
+//             },
+//             features: [
+//               {
+//                 type: 'TEXT_DETECTION',
+//               },
+//             ],
+//           },
+//         ],
+//       }),
+//     });
+//     const data = await response.json();
+//     const text = data.responses[0].fullTextAnnotation.text;
+//     return text;
+//   } catch (error) {
+//     console.log('error', error.message, error.stack);
+//   }
+// };
