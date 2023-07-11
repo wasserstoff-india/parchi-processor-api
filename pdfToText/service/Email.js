@@ -1,4 +1,4 @@
-import Email from '../model/Email.js';
+import Email from '../modal/Email.js';
 
 export const saveEmail = async (waId, name) => {
   console.log(waId, name, '::::::email');
