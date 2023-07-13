@@ -5,6 +5,8 @@ import pkg from 'openai';
 export const { OpenAIApi, ChatOpenAI, Configuration, LANGUAGES, FAISS } = pkg;
 import Tesseract from 'tesseract.js';
 import { create } from 'domain';
+// const csv = require('csv-parser');
+// const fs = require('fs');
 const canvaspkg = require('canvas');
 const { createCanvas, loadImage } = canvaspkg;
 export const conf = new Configuration({
@@ -64,6 +66,8 @@ export const CreateAction = async (messages, message, content) => {
   }
 };
 
+const csv = require('csv-parser');
+
 export const CsvActionResponse = async (
   response,
   content,
@@ -72,32 +76,39 @@ export const CsvActionResponse = async (
 ) => {
   console.log(content, ':::content'); // content is the gpt response message
   try {
-    let answer = '';
+    let answer = [];
     if (typeof content === 'string' && content.includes('Row to select')) {
       // Extract the conditions from the action
-      const conditionsMatch = content.match(/\[({[^}]+})\]/);
+      const conditionsMatch = content.match(/\[([^\]]+)\]/);
       console.log(conditionsMatch, ':::conditionsMatch');
       const conditions = conditionsMatch
-        ? conditionsMatch[1].replace(/'/g, '"')
-        : '';
+        ? `[${conditionsMatch[1]}]`.replace(/'/g, '"')
+        : [];
+      console.log(conditions, ':::conditions');
       const csvArray = csvtext.split('\n').map((row) => row.split(','));
 
       // Perform the row selection based on conditions
-      const selectedRows = csvArray.filter((row) => {
-        const rowObj = JSON.parse(row);
+      const selectedRows = csvArray.filter((row, index) => {
+        if (index < 2 || row.length === 0) {
+          return false;
+        }
+
         for (const condition of conditions) {
           const [key, value] = Object.entries(condition)[0];
-          if (rowObj[key.trim()] !== value.trim()) {
+          const columnValue = row[csvArray[1].indexOf(key.trim())];
+          if (columnValue !== value.trim()) {
             return false;
           }
         }
+
         return true;
       });
 
       // Get the answer based on the selected rows
-      answer = JSON.stringify(selectedRows);
+      answer = selectedRows;
       console.log(answer, '::::answer');
     }
+    return answer;
   } catch (error) {
     console.log(error);
     throw error;
