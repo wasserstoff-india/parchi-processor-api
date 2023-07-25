@@ -5,6 +5,7 @@ import {
   CreateCsv,
   getBotResponse,
   CsvActionResponse,
+  GptResponseCsv,
 } from '../service/response.js';
 import { generateSessionToken } from '../service/session.js';
 
@@ -12,12 +13,11 @@ export const Chats = async (req, res) => {
   try {
     const { userData, message, sessionId, summary, content, csvtext } =
       req.body;
-    console.log(req.body, ':::: req.body');
 
     if (summary && userData.waId && userData.waProfile.name && !sessionId) {
       // create chatsesssion
       const sessionToken = generateSessionToken();
-      const chatSession = new Chat({ sessionToken, summary });
+      const chatSession = new Chat({ sessionToken, summary, content });
       chatSession.messages.push(
         {
           sender: 'user',
@@ -57,7 +57,7 @@ export const Chats = async (req, res) => {
 
       const msgObj = {
         sender: 'user',
-        message: message,
+        message,
       };
       chatSession.messages.push(msgObj);
 
@@ -70,22 +70,34 @@ export const Chats = async (req, res) => {
       }
 
       const botMessage = await getBotResponse(chatSession.messages);
+      const storedContent = chatSession.content;
+      console.log(storedContent, '::storedContenttttttttttt Array');
 
       await updateChatSession(chatSession._id, message, botMessage);
       const { contents, response } = await CreateAction(
         chatSession.messages,
         message,
-        content
+        content,
+        storedContent
       );
       const csvResponse = await CsvActionResponse(
+        message,
         response,
         contents,
-        message,
         csvtext
       );
-      console.log(csvResponse, '::::csvresponse');
+       console.log('get CSV response: ', csvResponse);
+      console.log('end CSV---------------');
+      console.log(csvResponse, ':::csv response chat controller');
+      const newBotResponse = await GptResponseCsv(
+        message,
+        chatSession.messages,
+        csvResponse
+      );
 
-      return res.status(200).json({ chatSession, botMessage, csvResponse });
+      return res
+        .status(200)
+        .json({ chatSession, csvResponse, botMessage, newBotResponse });
     }
     return res.status(401).json({ message: 'Bad formed Request.' });
   } catch (err) {

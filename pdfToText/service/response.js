@@ -5,8 +5,8 @@ import pkg from 'openai';
 export const { OpenAIApi, ChatOpenAI, Configuration, LANGUAGES, FAISS } = pkg;
 import Tesseract from 'tesseract.js';
 import { create } from 'domain';
-// const csv = require('csv-parser');
-// const fs = require('fs');
+import Chat from '../modal/Chats.js';
+const csv = require('csv-parser');
 const canvaspkg = require('canvas');
 const { createCanvas, loadImage } = canvaspkg;
 export const conf = new Configuration({
@@ -32,23 +32,21 @@ export const CreateCsv = async (text) => {
   }
 };
 
-export const CreateAction = async (messages, message, content) => {
-  // console.log(content, ':::::content');
-  // console.log(text, ':::::text');
-  let MsgsArr = messages.map((msg) => {
+export const CreateAction = async (message, content, storedContent) => {
+  console.log(storedContent, '::storedContent Array');
+  let msgsArr = message.map((msg) => {
     return { role: msg.sender, content: msg.message };
   });
-  // console.log(message, ':::message');
-  // let msgsArr = message.map((msg) => {
-  //   return { role: msg.sender, content: msg.message[2] };
-  // });
-  // console.log(MsgsArr, '::msgsrarray');
   try {
-    const actions = `Row to select (<array of condition  eg name=mary>) - Select specific rows based on a given condition or set of conditions.
-    Sum of column (<column name eg:salary>, <array of condition eg:age>22>) - Calculate the sum of values in a specific column based on given conditions.
-    Average of column (<column name eg:salary>, <array of condition eg:salary , gender=female>) - Calculate the average of values in a specific column based on given conditions.
-    Sort and select (<column name eg:age>, <row to select eg:5>, <array of condition eg:gender=male>) - Sort the table based on a specific column, and select rows based on given conditions.`;
-    const prompt = `We have a csv table with following schema: \n ${content}. \n\n Suggest me an action to be performed out of these actions   in order to answer user's query. Actions that can be performed are - ${actions}. The User has asked following question : \n ${MsgsArr}.  Reply in the format: ACTION: <action_name(arguments)>`;
+    const actions = `$$$ row_to_select (  <column filters eg (name=mary)>) $$$ - Select the rows based on given conditions.  \n\n
+    $$$ sum_of_column (<column name eg:salary>,  <column filters eg:(age>22)>) $$$ - Calculate the sum of values in a specific column based on given conditions. \n\n
+    $$$ average_of_column (<column name eg:salary>,  <column filters eg:(salary>10000) , gender=female>) $$$ - Calculate the average of values in a specific column based on given conditions. \n\n
+    $$$ sort_and_select (<column name eg:age>,<sort order eg:asc/desc> <numbers of rows to select eg:5>,  <column filters eg:gender=male>) $$$- Sort the table based on a specific column, and select rows based on given conditions.`;
+    const prompt = `We have a csv table with following schema: \n ${storedContent}. \n\n Suggest me an action to be performed out of these actions   in order to answer user's query and the action should be in lowercase. Actions that can be performed are - ${actions}.\n\n The User has asked following question : \n ${JSON.stringify(
+      msgsArr
+    )}. \n\n Reply in the format: ACTION:$$$ <action_name(arguments)> $$$. And say nothing more. \n\n
+    Also provide the operation based on the ${JSON.stringify(msgsArr)}`;
+
     const ActionResponse = await openaiii.createChatCompletion({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'system', content: prompt }],
@@ -66,137 +64,283 @@ export const CreateAction = async (messages, message, content) => {
   }
 };
 
-const csv = require('csv-parser');
-
 export const CsvActionResponse = async (
+  message,
   response,
   content,
-  message,
   csvtext
 ) => {
-  console.log(content, ':::content'); // content is the gpt response message
   try {
-    let answer = [];
-    if (typeof content === 'string' && content.includes('Row to select')) {
-      // Extract the conditions from the action
-      const conditionsMatch = content.match(/\[([^\]]+)\]/);
-      console.log(conditionsMatch, ':::conditionsMatch');
-      const conditions = conditionsMatch
-        ? `[${conditionsMatch[1]}]`.replace(/'/g, '"')
-        : [];
-      console.log(conditions, ':::conditions');
-      const csvArray = csvtext.split('\n').map((row) => row.split(','));
+    const actionRegex = /ACTION:\$\$\$\s*(\w+)\s*[^$]*\$\$\$/i;
 
-      // Perform the row selection based on conditions
-      const selectedRows = csvArray.filter((row, index) => {
-        if (index < 2 || row.length === 0) {
-          return false;
-        }
+    const criteriaRegex = /\(([^()]+)\)/g;
 
-        for (const condition of conditions) {
-          const [key, value] = Object.entries(condition)[0];
-          const columnValue = row[csvArray[1].indexOf(key.trim())];
-          if (columnValue !== value.trim()) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      // Get the answer based on the selected rows
-      answer = selectedRows;
-      console.log(answer, '::::answer');
+    const regex = /(?<=\s|^)(\w+)(?=\s|$)/g;
+    let Content = content?.content ?? content;
+    const matches = Content.match(regex);
+    console.log(matches, '::matches');
+    if (matches) {
+      const positionedValue = matches.pop();
+      console.log(positionedValue, ':::positionedValue');
     }
-    return answer;
+
+    const actionMatch = Content.match(actionRegex);
+    const criteriaMatches = Content.match(criteriaRegex);
+    console.log(
+      actionMatch,
+      ':::action match',
+      criteriaMatches,
+      ':::criteria match'
+    );
+
+    if (!actionMatch || !criteriaMatches) {
+      throw new Error('Invalid content format. Action or criteria not found.');
+    }
+
+    const action = actionMatch[1];
+    console.log('Action:', action);
+
+    const criteriaArray = criteriaMatches.map((criteria) =>
+      criteria.slice(1, -1).trim()
+    );
+    console.log('Criteria:', criteriaArray);
+
+    const RowValues = criteriaArray.flatMap((criteria) => {
+      return criteria.split(',').map((column) => column.trim().split('=')[1]);
+    });
+    console.log('Row Values:', RowValues);
+
+    // Convert CSV text to lowercase and replace gaps (spaces) in column names
+    const modifiedCsvText = csvtext.toLowerCase().replace(/ /g, '');
+
+    // Read the CSV data
+    const rows = [];
+    const csvStream = csv({
+      mapHeaders: ({ header }) => header.toLowerCase().replace(/ /g, ''),
+    });
+    csvStream.write(modifiedCsvText);
+    csvStream.end();
+    let selectedRows = null;
+    let selectedRow = null;
+    // let filteredRows = null;
+    return await new Promise((resolve, reject) => {
+      csvStream
+        .on('data', async (data) => {
+          rows.push(data);
+        })
+        .on('end', async () => {
+          // here we have to make the calculation of the action by ourself and just passed to gpt with the result
+
+          // if (action === 'row_to_select') {
+          //   if (RowValues) {
+          //     // Second logic when RowValues is present
+          //     selectedRow = rows.filter((row) => {
+          //       for (const column in row) {
+          //         if (RowValues.includes(row[column])) {
+          //           return selectedRow;
+          //         }
+          //       }
+          //       return false;
+          //     });
+          //     console.log(selectedRow, '::selected row');
+          //   } else {
+          //     // First logic when RowValues is not present
+          //     const SortColumn = criteriaArray[0].split(/[><]=?/)[0].trim();
+          //     console.log(SortColumn, ':::sort column');
+          //     const operator = criteriaArray[0].match(/[><]=?/)[0];
+          //     console.log(operator, ':::operator column');
+          //     const number = parseFloat(criteriaArray[0].match(/\d+/)[0]);
+          //     console.log(number, ':::number column');
+          //     const filteredRows = rows.filter((row) => {
+          //       const columnValue = parseFloat(
+          //         row[SortColumn].replace(/[^0-9.-]+/g, '')
+          //       );
+          //       console.log(filteredRows, ':::filtered rows');
+          //       switch (operator) {
+          //         case '>':
+          //           return columnValue > number;
+          //         case '<':
+          //           return columnValue < number;
+          //         case '>=':
+          //           return columnValue >= number;
+          //         case '<=':
+          //           return columnValue <= number;
+          //         default:
+          //           return false;
+          //       }
+          //     });
+          //     console.log(filteredRows, ':::filtered rows');
+          //     return filteredRows;
+          //   }
+          // }
+
+          if (action === 'sum_of_column') {
+            selectedRows = rows.filter((row) => {
+              for (const column in row) {
+                if (RowValues.includes(row[column])) {
+                  return true;
+                }
+              }
+              return false;
+            });
+            console.log(selectedRows, '::selected rows');
+            const headerKeys = Object.keys(selectedRows[0]);
+            console.log(headerKeys, '::headerkeys');
+            const searchText = message.toLowerCase();
+            console.log(searchText, '::searchText');
+
+            let sum = 0;
+            let count = 0;
+            for (const key of headerKeys) {
+              const value = key.toLowerCase();
+              if (searchText.includes(value)) {
+                for (const row of selectedRows) {
+                  const columnValue = row[key];
+                  if (columnValue) {
+                    const numericValue = parseFloat(
+                      columnValue.replace(/[^0-9.-]+/g, '')
+                    );
+                    sum += numericValue;
+                    count++;
+                  }
+                  console.log(columnValue, '::::column value');
+                  console.log(sum, ':::sum', count, ':::count');
+                  resolve(sum);
+                }
+              }
+            }
+          } else if (action === 'average_of_column') {
+            console.log('22222');
+            console.log(rows, ':::rows');
+            console.log('Row values: ', rows.length, RowValues);
+            selectedRows = rows.filter((row) => {
+              for (const column in row) {
+                if (RowValues.includes(row[column])) {
+                  return true;
+                }
+              }
+              return false;
+            });
+            console.log(selectedRows, ':::selected rows');
+            const headerKeys = Object.keys(selectedRows[0]);
+            console.log(headerKeys, '::headerkeys');
+            const searchText = message.toLowerCase();
+            console.log(searchText, '::searchText');
+
+            let sum = 0;
+            let count = 0;
+            for (const key of headerKeys) {
+              const value = key.toLowerCase();
+              if (searchText.includes(value)) {
+                for (const row of selectedRows) {
+                  const columnValue = row[key];
+                  if (columnValue) {
+                    const numericValue = parseFloat(
+                      columnValue.replace(/[^0-9.-]+/g, '')
+                    );
+                    sum += numericValue;
+                    console.log(sum, ':::summmmm');
+                    console.log(count, ':::count');
+                    count++;
+                  }
+                  const average = sum / count;
+                  console.log(`Average of the ${key}`, average);
+                  resolve(average);
+                }
+              }
+            }
+          } else if (action === 'row_to_select') {
+            console.log('12346');
+            if (RowValues[0] === undefined) {
+              console.log('12346');
+              const SortColumn = criteriaArray[0].split(/[><]=?/)[0].trim();
+              console.log(SortColumn, ':::sort column');
+              const operator = criteriaArray[0].match(/[><]=?/)[0];
+              console.log(operator, ':::operator column');
+              const number = parseFloat(criteriaArray[0].match(/\d+/)[0]);
+              console.log(number, ':::number column');
+              const filteredRows = rows.filter((row) => {
+                const columnValue = parseFloat(
+                  row[SortColumn].replace(/[^0-9.-]+/g, '')
+                );
+                switch (operator) {
+                  case '>':
+                    return columnValue > number;
+                  case '<':
+                    return columnValue < number;
+                  case '>=':
+                    return columnValue >= number;
+                  case '<=':
+                    return columnValue <= number;
+                  default:
+                    return false;
+                }
+              });
+              console.log(filteredRows, ':::filtered rows');
+              resolve(filteredRows);
+            } else {
+              console.log(RowValues, ':::rowvaluessssss');
+              selectedRows = rows.filter((row) => {
+                for (const column in row) {
+                  // console.log(row.column, ':::column');
+                  if (RowValues.includes(row[column])) {
+                    return true;
+                  }
+                }
+                return false;
+              });
+              console.log(selectedRows, '::selecteddddddd rows');
+              resolve(selectedRows);
+            }
+          }
+        });
+    });
   } catch (error) {
     console.log(error);
     throw error;
   }
 };
 
-// const openaiiii = new OpenAIApi(conf);
-// const models = new OpenAI({CHATAPI});
-// export const vectorizeText = async (rows) => {
-//   try {
-//     const splitter = new CharacterTextSplitter({
-//       chunkSize: 1536,
-//       chunkOverlap: 200,
-//     });
-//     // console.log(splitter, '::::splitter');
-//     console.log(rows.length);
-//     const fileDocs = await splitter.createDocuments(rows, [], {
-//       chunkHeader: `DOCUMENT NAME: File Interview\n\n---\n\n`,
-//       appendChunkOverlapHeader: true,
-//     });
-//     // console.log(fileDocs, '::::fileDocs');
+export const GptResponseCsv = async (message, messages, csvResponse) => {
+  // console.log('Start get gpt Response ');
+  // console.log(csvResponse, ':::return csvResponse csv ');
 
-//     const textContent = fileDocs.map((doc) => doc.text).join(' ');
-//     const response = await openaiiii.createEmbedding({
-//       model: 'text-embedding-ada-002',
-//       input: [textContent],
-//     });
-//     console.log(response.data?.data[0]?.embedding, ':::response');
+  let msgsArr = messages.map((msg) => {
+    return { role: msg.sender, content: msg.message };
+  });
 
-//     const embeddings = response.data?.data[0]?.embedding;
-//     const documents = embeddings.map((embedding) => ({
-//       vector: embedding.slice(0, 100),
-//     }));
+  // Add the prompt message to the msgsArr
+  const promptMessage = {
+    role: 'system',
+    content: `Based on the given result answer the following question of the user message. \n\n result : ${JSON.stringify(
+      csvResponse
+    )} \n\n Question :${msgsArr
+      .map((msg) => `{ role: '${msg.role}', content: '${msg.content}' }`)
+      .join(', ')}\n\n.`,
+  };
+  msgsArr.push(promptMessage);
 
-//     const vectorStore = await Vector.insertMany(documents);
-//     // console.log(vectorStore, '::::vector store');
+  // console.log(msgsArr, 'msgarray');
 
-//     const retrieveResults = async (queryText, k) => {
-//       const input = JSON.stringify(vectorStore.map((item) => item.vector));
-//       const response = await openaiiii.createEmbedding({
-//         model: 'text-embedding-ada-002',
-//         input: input,
-//         query: queryText,
-//         numResults: k,
-//       });
+  try {
+    const ActionResponse = await openaiii.createChatCompletion({
+      model: 'gpt-3.5-turbo',
+      messages: msgsArr,
+    });
 
-//       return response.data;
-//     };
+    console.log(
+      ActionResponse.data.choices[0].message.content,
+      ':::ActionResponse'
+    );
 
-//     // Query the vector store
-//     const queryText = 'lastName of mary'; // Replace with your query text
-//     const k = 5; // Number of results to retrieve
-//     const results = await retrieveResults(queryText, k);
-
-//     console.log(results);
-//     return results;
-//   } catch (error) {
-//     console.log(error.response);
-//     throw error;
-//   }
-// };
-
-// const Vectorretriever = async (vectors) => {
-//   const chain = RetrievalQAChain.fromLLM({
-//     model: models,a
-//     retriever: vectors,
-//   });
-//   console.log(chain, ':::::chains');
-//   const res = await chain.call({ query: question });
-//   console.log(res, '::::res');
-//   return res;
-// };
-
-// const openaiii = new OpenAIApi(conf);
-// export const uploadDataToAPI = async (jsonData) => {
-//   try {
-//     const response = await openaiii.createFile({
-//       file: 'data.jsonl',
-//       data: JSON.stringify(jsonData),
-//       purpose: 'fine-tune',
-//     });
-
-//     return response.data;
-//   } catch (err) {
-//     console.log('Error uploading data to OpenAI Data API: ' + err);
-//     throw err;
-//   }
-// };
+    const response = ActionResponse.data.choices[0].message.content;
+    console.log('response in GPTResponse CSV: ******************');
+    return response;
+  } catch (error) {
+    console.log(error.data);
+    throw error;
+  }
+};
 
 const openai = new OpenAIApi(conf);
 export const getBotResponse = async (message) => {
