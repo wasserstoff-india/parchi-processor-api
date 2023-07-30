@@ -4,8 +4,9 @@ import { CHATAPI } from '../config/config.js';
 import pkg from 'openai';
 export const { OpenAIApi, ChatOpenAI, Configuration, LANGUAGES, FAISS } = pkg;
 import Tesseract from 'tesseract.js';
-import { create } from 'domain';
-import Chat from '../modal/Chats.js';
+import { functions } from './Function.js';
+// import { create } from 'domain';
+// import Chat from '../modal/Chats.js';
 const csv = require('csv-parser');
 const canvaspkg = require('canvas');
 const { createCanvas, loadImage } = canvaspkg;
@@ -32,96 +33,188 @@ export const CreateCsv = async (text) => {
   }
 };
 
-export const CreateAction = async (message, content, storedContent) => {
-  console.log(storedContent, '::storedContent Array');
-  let msgsArr = message.map((msg) => {
-    return { role: msg.sender, content: msg.message };
-  });
-  try {
-    const actions = `$$$ row_to_select (  <column filters eg (name=mary)>) $$$ - Select the rows based on given conditions.  \n\n
-    $$$ sum_of_column (<column name eg:salary>,  <column filters eg:(age>22)>) $$$ - Calculate the sum of values in a specific column based on given conditions. \n\n
-    $$$ average_of_column (<column name eg:salary>,  <column filters eg:(salary>10000) , gender=female>) $$$ - Calculate the average of values in a specific column based on given conditions. \n\n
-    $$$ sort_and_select (<column name eg:age>,<sort order eg:asc/desc> <numbers of rows to select eg:5>,  <column filters eg:gender=male>) $$$- Sort the table based on a specific column, and select rows based on given conditions.`;
-    const prompt = `We have a csv table with following schema: \n ${storedContent}. \n\n Suggest me an action to be performed out of these actions   in order to answer user's query and the action should be in lowercase. Actions that can be performed are - ${actions}.\n\n The User has asked following question : \n ${JSON.stringify(
-      msgsArr
-    )}. \n\n Reply in the format: ACTION:$$$ <action_name(arguments)> $$$. And say nothing more. \n\n
-    Also provide the operation based on the ${JSON.stringify(msgsArr)}`;
+export const CreateAction = async (message, storedContent, csvtext) => {
+  console.log(message, '::message');
 
-    const ActionResponse = await openaiii.createChatCompletion({
-      model: 'gpt-3.5-turbo',
+  try {
+    const prompt = `We are Parchi, a node js based backend to parse and summarise documents. There are functions in the backend that can do various tasks related to this and are mentioned below. You have to be very strict in answering and do not go out of the domain of question or preferred language of choice as node js. If you respond to any function call or code in any other language, the user will penalise us and we will penalise you in turn and always take care of the case sesntive. We have a CSV table with the following schema: ${storedContent}. question: ${JSON.stringify(
+      message
+    )}.`;
+
+    const Response = await openaiii.createChatCompletion({
+      model: 'gpt-3.5-turbo-16k-0613',
       messages: [{ role: 'system', content: prompt }],
+      functions: functions,
     });
-    console.log(
-      ActionResponse.data.choices[0].message.content,
-      ':::ActionResponse'
-    );
-    const contents = ActionResponse.data.choices[0].message.content;
-    const response = ActionResponse.data.choices[0].message;
-    return { response, contents };
+    if (Response.data.choices[0].finish_reason === 'function_call') {
+      const functionData = Response.data.choices[0].message?.function_call;
+      console.log(functionData, ':::functionData');
+
+      const functionName = functionData.name;
+      const functionArguments = JSON.parse(functionData.arguments);
+
+      console.log(functionName, ':::functionName');
+      console.log(functionArguments, ':::functionArguments');
+
+      // if (
+      //   functionName === 'row_to_select' ||
+      //   functionName === 'sum_of_column' ||
+      //   functionName === 'average_of_column' ||
+      //   functionName === 'row_to_select'
+      // ) {
+      let result = await CsvActionResponse(
+        message,
+        functionArguments,
+        functionName,
+        csvtext
+      );
+
+      console.log(result, 'executed successfully');
+
+      const gptresult = await GptResponseCsv(message, result);
+      // console.log(gptresult, 'gptresult');
+      return gptresult;
+    }
+    return;
   } catch (error) {
-    console.log(error);
+    console.log('error in create Acction: ', error);
     throw error;
   }
 };
 
+export const filterRows = (rows, columnFilters) => {
+  if (
+    columnFilters.includes('>') ||
+    columnFilters.includes('<') ||
+    columnFilters.includes('=')
+  ) {
+    return filteredRowsWithOperator(rows, columnFilters);
+  } else {
+    return filteredRowsSimple(rows, columnFilters);
+  }
+};
+
+const filteredRowsSimple = (rows, columnFilters) => {
+  const filters = columnFilters.split(/ OR | or /);
+  const selectedRows = [];
+
+  filters.forEach((filter) => {
+    const [columnName, value] = filter.replace(/'/g, '').split('=');
+    const trimmedColumnName = columnName.trim().toLowerCase();
+    const trimmedRowValue = value.trim().toLowerCase();
+
+    const filteredRows = rows.filter((row) => {
+      const columnValue = row[trimmedColumnName].trim().toLowerCase();
+      return columnValue === trimmedRowValue;
+    });
+
+    selectedRows.push(...filteredRows);
+  });
+
+  return selectedRows;
+};
+
+const filteredRowsWithOperator = (rows, columnFilters) => {
+  const filters = columnFilters.split(/ OR | or /);
+  const selectedRows = [];
+
+  filters.forEach((filter) => {
+    const [columnName, filterValue] = filter.replace(/'/g, '').split(/[><=]/);
+    const operator = filter.replace(/[^><=]/g, '').trim();
+    const trimmedColumnName = columnName.trim().toLowerCase();
+    const trimmedRowValue = filterValue.trim().toLowerCase();
+
+    const filteredRows = rows.filter((row) => {
+      const columnValue = parseFloat(
+        row[trimmedColumnName].replace(/[^0-9.-]+/g, '')
+      );
+      if (!isNaN(columnValue)) {
+        switch (operator) {
+          case '>':
+            return columnValue > parseFloat(trimmedRowValue);
+          case '>=':
+            return columnValue >= parseFloat(trimmedRowValue);
+          case '<':
+            return columnValue < parseFloat(trimmedRowValue);
+          case '<=':
+            return columnValue <= parseFloat(trimmedRowValue);
+          case '=':
+            return columnValue === parseFloat(trimmedRowValue);
+          default:
+            return false;
+        }
+      }
+      return false;
+    });
+
+    selectedRows.push(...filteredRows);
+  });
+
+  return selectedRows;
+};
+
+export const filteredRows = (rows, columnFilters) => {
+  const filters = columnFilters.split(/ OR | or /);
+  const selectedRows = [];
+
+  filters.forEach((filter) => {
+    const [columnName, filterValue] = filter.replace(/'/g, '').split(/[><=]/);
+    const operator = filter.replace(/[^><=]/g, '').trim();
+    const trimmedColumnName = columnName.trim().toLowerCase();
+    const trimmedRowValue = filterValue.trim().toLowerCase();
+    console.log(trimmedColumnName, ':::trimmedColumnName');
+    console.log(operator, ':::operator');
+    console.log(trimmedRowValue, ':::trimmedRowValue');
+
+    const filteredRows = rows.filter((row) => {
+      const columnValue = parseFloat(
+        row[trimmedColumnName].replace(/[^0-9.-]+/g, '')
+      );
+      if (!isNaN(columnValue)) {
+        switch (operator) {
+          case '>':
+            return columnValue > parseFloat(trimmedRowValue);
+          case '>=':
+            return columnValue >= parseFloat(trimmedRowValue);
+          case '<':
+            return columnValue < parseFloat(trimmedRowValue);
+          case '<=':
+            return columnValue <= parseFloat(trimmedRowValue);
+          case '=':
+            return columnValue === parseFloat(trimmedRowValue);
+          default:
+            return false;
+        }
+      }
+      return false;
+    });
+
+    selectedRows.push(...filteredRows);
+  });
+
+  return selectedRows;
+};
+
 export const CsvActionResponse = async (
   message,
-  response,
-  content,
+  functionArguments,
+  functionName,
   csvtext
 ) => {
   try {
-    const actionRegex = /ACTION:\$\$\$\s*(\w+)\s*[^$]*\$\$\$/i;
+    console.log(message, 'message csv response');
+    console.log(functionArguments, 'functionArguments csv response');
 
-    const criteriaRegex = /\(([^()]+)\)/g;
-
-    const regex = /(?<=\s|^)(\w+)(?=\s|$)/g;
-    let Content = content?.content ?? content;
-    const matches = Content.match(regex);
-    console.log(matches, '::matches');
-    if (matches) {
-      const positionedValue = matches.pop();
-      console.log(positionedValue, ':::positionedValue');
-    }
-
-    const actionMatch = Content.match(actionRegex);
-    const criteriaMatches = Content.match(criteriaRegex);
-    console.log(
-      actionMatch,
-      ':::action match',
-      criteriaMatches,
-      ':::criteria match'
-    );
-
-    if (!actionMatch || !criteriaMatches) {
-      throw new Error('Invalid content format. Action or criteria not found.');
-    }
-
-    const action = actionMatch[1];
-    console.log('Action:', action);
-
-    const criteriaArray = criteriaMatches.map((criteria) =>
-      criteria.slice(1, -1).trim()
-    );
-    console.log('Criteria:', criteriaArray);
-
-    const RowValues = criteriaArray.flatMap((criteria) => {
-      return criteria.split(',').map((column) => column.trim().split('=')[1]);
-    });
-    console.log('Row Values:', RowValues);
-
-    // Convert CSV text to lowercase and replace gaps (spaces) in column names
+    const rows = [];
+    let selectedRows = null;
     const modifiedCsvText = csvtext.toLowerCase().replace(/ /g, '');
 
     // Read the CSV data
-    const rows = [];
     const csvStream = csv({
       mapHeaders: ({ header }) => header.toLowerCase().replace(/ /g, ''),
     });
     csvStream.write(modifiedCsvText);
     csvStream.end();
-    let selectedRows = null;
-    let selectedRow = null;
     // let filteredRows = null;
     return await new Promise((resolve, reject) => {
       csvStream
@@ -129,169 +222,73 @@ export const CsvActionResponse = async (
           rows.push(data);
         })
         .on('end', async () => {
-          // here we have to make the calculation of the action by ourself and just passed to gpt with the result
+          switch (functionName) {
+            case 'row_to_select': {
+              const { columnFilters } = functionArguments;
+              selectedRows = filterRows(rows, columnFilters);
 
-          // if (action === 'row_to_select') {
-          //   if (RowValues) {
-          //     // Second logic when RowValues is present
-          //     selectedRow = rows.filter((row) => {
-          //       for (const column in row) {
-          //         if (RowValues.includes(row[column])) {
-          //           return selectedRow;
-          //         }
-          //       }
-          //       return false;
-          //     });
-          //     console.log(selectedRow, '::selected row');
-          //   } else {
-          //     // First logic when RowValues is not present
-          //     const SortColumn = criteriaArray[0].split(/[><]=?/)[0].trim();
-          //     console.log(SortColumn, ':::sort column');
-          //     const operator = criteriaArray[0].match(/[><]=?/)[0];
-          //     console.log(operator, ':::operator column');
-          //     const number = parseFloat(criteriaArray[0].match(/\d+/)[0]);
-          //     console.log(number, ':::number column');
-          //     const filteredRows = rows.filter((row) => {
-          //       const columnValue = parseFloat(
-          //         row[SortColumn].replace(/[^0-9.-]+/g, '')
-          //       );
-          //       console.log(filteredRows, ':::filtered rows');
-          //       switch (operator) {
-          //         case '>':
-          //           return columnValue > number;
-          //         case '<':
-          //           return columnValue < number;
-          //         case '>=':
-          //           return columnValue >= number;
-          //         case '<=':
-          //           return columnValue <= number;
-          //         default:
-          //           return false;
-          //       }
-          //     });
-          //     console.log(filteredRows, ':::filtered rows');
-          //     return filteredRows;
-          //   }
-          // }
-
-          if (action === 'sum_of_column') {
-            selectedRows = rows.filter((row) => {
-              for (const column in row) {
-                if (RowValues.includes(row[column])) {
-                  return true;
-                }
-              }
-              return false;
-            });
-            console.log(selectedRows, '::selected rows');
-            const headerKeys = Object.keys(selectedRows[0]);
-            console.log(headerKeys, '::headerkeys');
-            const searchText = message.toLowerCase();
-            console.log(searchText, '::searchText');
-
-            let sum = 0;
-            let count = 0;
-            for (const key of headerKeys) {
-              const value = key.toLowerCase();
-              if (searchText.includes(value)) {
-                for (const row of selectedRows) {
-                  const columnValue = row[key];
-                  if (columnValue) {
-                    const numericValue = parseFloat(
-                      columnValue.replace(/[^0-9.-]+/g, '')
-                    );
-                    sum += numericValue;
-                    count++;
-                  }
-                  console.log(columnValue, '::::column value');
-                  console.log(sum, ':::sum', count, ':::count');
-                  resolve(sum);
-                }
-              }
-            }
-          } else if (action === 'average_of_column') {
-            console.log('22222');
-            console.log(rows, ':::rows');
-            console.log('Row values: ', rows.length, RowValues);
-            selectedRows = rows.filter((row) => {
-              for (const column in row) {
-                if (RowValues.includes(row[column])) {
-                  return true;
-                }
-              }
-              return false;
-            });
-            console.log(selectedRows, ':::selected rows');
-            const headerKeys = Object.keys(selectedRows[0]);
-            console.log(headerKeys, '::headerkeys');
-            const searchText = message.toLowerCase();
-            console.log(searchText, '::searchText');
-
-            let sum = 0;
-            let count = 0;
-            for (const key of headerKeys) {
-              const value = key.toLowerCase();
-              if (searchText.includes(value)) {
-                for (const row of selectedRows) {
-                  const columnValue = row[key];
-                  if (columnValue) {
-                    const numericValue = parseFloat(
-                      columnValue.replace(/[^0-9.-]+/g, '')
-                    );
-                    sum += numericValue;
-                    console.log(sum, ':::summmmm');
-                    console.log(count, ':::count');
-                    count++;
-                  }
-                  const average = sum / count;
-                  console.log(`Average of the ${key}`, average);
-                  resolve(average);
-                }
-              }
-            }
-          } else if (action === 'row_to_select') {
-            console.log('12346');
-            if (RowValues[0] === undefined) {
-              console.log('12346');
-              const SortColumn = criteriaArray[0].split(/[><]=?/)[0].trim();
-              console.log(SortColumn, ':::sort column');
-              const operator = criteriaArray[0].match(/[><]=?/)[0];
-              console.log(operator, ':::operator column');
-              const number = parseFloat(criteriaArray[0].match(/\d+/)[0]);
-              console.log(number, ':::number column');
-              const filteredRows = rows.filter((row) => {
-                const columnValue = parseFloat(
-                  row[SortColumn].replace(/[^0-9.-]+/g, '')
-                );
-                switch (operator) {
-                  case '>':
-                    return columnValue > number;
-                  case '<':
-                    return columnValue < number;
-                  case '>=':
-                    return columnValue >= number;
-                  case '<=':
-                    return columnValue <= number;
-                  default:
-                    return false;
-                }
-              });
-              console.log(filteredRows, ':::filtered rows');
-              resolve(filteredRows);
-            } else {
-              console.log(RowValues, ':::rowvaluessssss');
-              selectedRows = rows.filter((row) => {
-                for (const column in row) {
-                  // console.log(row.column, ':::column');
-                  if (RowValues.includes(row[column])) {
-                    return true;
-                  }
-                }
-                return false;
-              });
-              console.log(selectedRows, '::selecteddddddd rows');
+              console.log(selectedRows, ':::selected rows');
               resolve(selectedRows);
+              break;
             }
+            case 'sum_of_column': {
+              const headerKeys = Object.keys(rows[0]);
+              const searchText = message.toLowerCase();
+
+              console.log(searchText, '::searchText');
+              console.log(headerKeys, ':::headerKeys');
+
+              const { columnFilters } = functionArguments;
+              console.log(columnFilters, ':::columnFilters');
+
+              selectedRows = filterRows(rows, columnFilters);
+              console.log(selectedRows, ':::selected rows');
+
+              let sum = 0;
+              for (const key of headerKeys) {
+                const value = key.toLowerCase(); // Convert the header key to lowercase to match with searchText
+                if (searchText.includes(value)) {
+                  for (const row of selectedRows) {
+                    const columnValue = parseFloat(
+                      row[key].replace(/[^0-9.-]+/g, '')
+                    );
+                    if (!isNaN(columnValue)) {
+                      sum += columnValue;
+                    }
+                  }
+                }
+              }
+
+              resolve(sum);
+              break;
+            }
+            case 'average_of_column': {
+              const { columnName, columnFilters } = functionArguments;
+              console.log(columnName, ':::columnName');
+              console.log(columnFilters, ':::columnFilters');
+              selectedRows = filterRows(rows, columnFilters);
+              console.log(selectedRows, ':::selected rows');
+              let sum = 0;
+              let count = 0; // To keep track of the number of valid rows
+              for (const row of selectedRows) {
+                const columnValue = parseFloat(
+                  row[columnName].replace(/[^0-9.-]+/g, '')
+                );
+                if (!isNaN(columnValue)) {
+                  sum += columnValue;
+                  count++; // Increment count for each valid row
+                }
+              }
+
+              // Calculate the average by dividing the sum by the number of valid rows
+              const average = count > 0 ? sum / count : 0;
+              resolve(average);
+              break;
+            }
+            case 'sort_and_select': {
+            }
+            default:
+              throw new Error(`Unsupported function name: ${functionName}`);
           }
         });
     });
@@ -301,31 +298,257 @@ export const CsvActionResponse = async (
   }
 };
 
-export const GptResponseCsv = async (message, messages, csvResponse) => {
-  // console.log('Start get gpt Response ');
-  // console.log(csvResponse, ':::return csvResponse csv ');
+// export const CsvActionResponse = async (
+//   message,
+//   response,
+//   content,
+//   csvtext
+// ) => {
+//   try {
+//     const actionRegex = /ACTION:\$\$\$\s*(\w+)\s*[^$]*\$\$\$/i;
 
-  let msgsArr = messages.map((msg) => {
-    return { role: msg.sender, content: msg.message };
-  });
+//     const criteriaRegex = /\(([^()]+)\)/g;
 
-  // Add the prompt message to the msgsArr
+//     const regex = /(?<=\s|^)(\w+)(?=\s|$)/g;
+//     let Content = content?.content ?? content;
+//     const matches = Content.match(regex);
+//     console.log(matches, '::matches');
+//     if (matches) {
+//       const positionedValue = matches.pop();
+//       console.log(positionedValue, ':::positionedValue');
+//     }
+
+//     const actionMatch = Content.match(actionRegex);
+//     const criteriaMatches = Content.match(criteriaRegex);
+//     console.log(
+//       actionMatch,
+//       ':::action match',
+//       criteriaMatches,
+//       ':::criteria match'
+//     );
+
+//     if (!actionMatch || !criteriaMatches) {
+//       throw new Error('Invalid content format. Action or criteria not found.');
+//     }
+
+//     const action = actionMatch[1];
+//     console.log('Action:', action);
+
+//     const criteriaArray = criteriaMatches.map((criteria) =>
+//       criteria.slice(1, -1).trim()
+//     );
+//     console.log('Criteria:', criteriaArray);
+
+//     const RowValues = criteriaArray.flatMap((criteria) => {
+//       return criteria.split(',').map((column) => column.trim().split('=')[1]);
+//     });
+//     console.log('Row Values:', RowValues);
+
+//     // Convert CSV text to lowercase and replace gaps (spaces) in column names
+//     const modifiedCsvText = csvtext.toLowerCase().replace(/ /g, '');
+
+//     // Read the CSV data
+//     const rows = [];
+//     const csvStream = csv({
+//       mapHeaders: ({ header }) => header.toLowerCase().replace(/ /g, ''),
+//     });
+//     csvStream.write(modifiedCsvText);
+//     csvStream.end();
+//     let selectedRows = null;
+//     let selectedRow = null;
+//     // let filteredRows = null;
+//     return await new Promise((resolve, reject) => {
+//       csvStream
+//         .on('data', async (data) => {
+//           rows.push(data);
+//         })
+//         .on('end', async () => {
+//           // here we have to make the calculation of the action by ourself and just passed to gpt with the result
+
+//           // if (action === 'row_to_select') {
+//           //   if (RowValues) {
+//           //     // Second logic when RowValues is present
+//           //     selectedRow = rows.filter((row) => {
+//           //       for (const column in row) {
+//           //         if (RowValues.includes(row[column])) {
+//           //           return selectedRow;
+//           //         }
+//           //       }
+//           //       return false;
+//           //     });
+//           //     console.log(selectedRow, '::selected row');
+//           //   } else {
+//           //     // First logic when RowValues is not present
+//           //     const SortColumn = criteriaArray[0].split(/[><]=?/)[0].trim();
+//           //     console.log(SortColumn, ':::sort column');
+//           //     const operator = criteriaArray[0].match(/[><]=?/)[0];
+//           //     console.log(operator, ':::operator column');
+//           //     const number = parseFloat(criteriaArray[0].match(/\d+/)[0]);
+//           //     console.log(number, ':::number column');
+//           //     const filteredRows = rows.filter((row) => {
+//           //       const columnValue = parseFloat(
+//           //         row[SortColumn].replace(/[^0-9.-]+/g, '')
+//           //       );
+//           //       console.log(filteredRows, ':::filtered rows');
+//           //       switch (operator) {
+//           //         case '>':
+//           //           return columnValue > number;
+//           //         case '<':
+//           //           return columnValue < number;
+//           //         case '>=':
+//           //           return columnValue >= number;
+//           //         case '<=':
+//           //           return columnValue <= number;
+//           //         default:
+//           //           return false;
+//           //       }
+//           //     });
+//           //     console.log(filteredRows, ':::filtered rows');
+//           //     return filteredRows;
+//           //   }
+//           // }
+
+//           if (action === 'sum_of_column') {
+//             selectedRows = rows.filter((row) => {
+//               for (const column in row) {
+//                 if (RowValues.includes(row[column])) {
+//                   return true;
+//                 }
+//               }
+//               return false;
+//             });
+//             console.log(selectedRows, '::selected rows');
+//             const headerKeys = Object.keys(selectedRows[0]);
+//             console.log(headerKeys, '::headerkeys');
+//             const searchText = message.toLowerCase();
+//             console.log(searchText, '::searchText');
+
+//             let sum = 0;
+//             let count = 0;
+//             for (const key of headerKeys) {
+//               const value = key.toLowerCase();
+//               if (searchText.includes(value)) {
+//                 for (const row of selectedRows) {
+//                   const columnValue = row[key];
+//                   if (columnValue) {
+//                     const numericValue = parseFloat(
+//                       columnValue.replace(/[^0-9.-]+/g, '')
+//                     );
+//                     sum += numericValue;
+//                     count++;
+//                   }
+//                   console.log(columnValue, '::::column value');
+//                   console.log(sum, ':::sum', count, ':::count');
+//                   resolve(sum);
+//                 }
+//               }
+//             }
+//           } else if (action === 'average_of_column') {
+//             console.log('22222');
+//             console.log(rows, ':::rows');
+//             console.log('Row values: ', rows.length, RowValues);
+//             selectedRows = rows.filter((row) => {
+//               for (const column in row) {
+//                 if (RowValues.includes(row[column])) {
+//                   return true;
+//                 }
+//               }
+//               return false;
+//             });
+//             console.log(selectedRows, ':::selected rows');
+//             const headerKeys = Object.keys(selectedRows[0]);
+//             console.log(headerKeys, '::headerkeys');
+//             const searchText = message.toLowerCase();
+//             console.log(searchText, '::searchText');
+
+//             let sum = 0;
+//             let count = 0;
+//             for (const key of headerKeys) {
+//               const value = key.toLowerCase();
+//               if (searchText.includes(value)) {
+//                 for (const row of selectedRows) {
+//                   const columnValue = row[key];
+//                   if (columnValue) {
+//                     const numericValue = parseFloat(
+//                       columnValue.replace(/[^0-9.-]+/g, '')
+//                     );
+//                     sum += numericValue;
+//                     console.log(sum, ':::summmmm');
+//                     console.log(count, ':::count');
+//                     count++;
+//                   }
+//                   const average = sum / count;
+//                   console.log(`Average of the ${key}`, average);
+//                   resolve(average);
+//                 }
+//               }
+//             }
+//           } else if (action === 'row_to_select') {
+//             console.log('12346');
+//             if (RowValues[0] === undefined) {
+//               console.log('12346');
+//               const SortColumn = criteriaArray[0].split(/[><]=?/)[0].trim();
+//               console.log(SortColumn, ':::sort column');
+//               const operator = criteriaArray[0].match(/[><]=?/)[0];
+//               console.log(operator, ':::operator column');
+//               const number = parseFloat(criteriaArray[0].match(/\d+/)[0]);
+//               console.log(number, ':::number column');
+//               const filteredRows = rows.filter((row) => {
+//                 const columnValue = parseFloat(
+//                   row[SortColumn].replace(/[^0-9.-]+/g, '')
+//                 );
+//                 switch (operator) {
+//                   case '>':
+//                     return columnValue > number;
+//                   case '<':
+//                     return columnValue < number;
+//                   case '>=':
+//                     return columnValue >= number;
+//                   case '<=':
+//                     return columnValue <= number;
+//                   default:
+//                     return false;
+//                 }
+//               });
+//               console.log(filteredRows, ':::filtered rows');
+//               resolve(filteredRows);
+//             } else {
+//               console.log(RowValues, ':::rowvaluessssss');
+//               selectedRows = rows.filter((row) => {
+//                 for (const column in row) {
+//                   // console.log(row.column, ':::column');
+//                   if (RowValues.includes(row[column])) {
+//                     return true;
+//                   }
+//                 }
+//                 return false;
+//               });
+//               console.log(selectedRows, '::selecteddddddd rows');
+//               resolve(selectedRows);
+//             }
+//           }
+//         });
+//     });
+//   } catch (error) {
+//     console.log(error);
+//     throw error;
+//   }
+// };
+
+export const GptResponseCsv = async (message, result) => {
+  console.log(message, 'message ');
+  console.log(result, '::resultin gpt response');
+
   const promptMessage = {
     role: 'system',
-    content: `Based on the given result answer the following question of the user message. \n\n result : ${JSON.stringify(
-      csvResponse
-    )} \n\n Question :${msgsArr
-      .map((msg) => `{ role: '${msg.role}', content: '${msg.content}' }`)
-      .join(', ')}\n\n.`,
+    content: `Based on the given result answer the following question of the user message and give the answer carefully
+     . \n\n result : ${JSON.stringify(result)} \n\n Question :${message}`,
   };
-  msgsArr.push(promptMessage);
-
-  // console.log(msgsArr, 'msgarray');
 
   try {
     const ActionResponse = await openaiii.createChatCompletion({
-      model: 'gpt-3.5-turbo',
-      messages: msgsArr,
+      model: 'gpt-3.5-turbo-16k-0613',
+      messages: [promptMessage],
     });
 
     console.log(
@@ -337,13 +560,14 @@ export const GptResponseCsv = async (message, messages, csvResponse) => {
     console.log('response in GPTResponse CSV: ******************');
     return response;
   } catch (error) {
-    console.log(error.data);
-    throw error;
+    console.log('error in actio response ', error.stack);
+    throw error.stack;
   }
 };
 
 const openai = new OpenAIApi(conf);
-export const getBotResponse = async (message) => {
+export const getBotResponse = async (message, result) => {
+  console.log('gpt response strated');
   let msgsArr = message.map((msg) => {
     return { role: msg.sender, content: msg.message };
   });

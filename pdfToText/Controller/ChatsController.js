@@ -2,10 +2,12 @@ import axios from 'axios';
 import Chat from '../modal/Chats.js';
 import {
   CreateAction,
-  CreateCsv,
-  getBotResponse,
   CsvActionResponse,
   GptResponseCsv,
+  // CreateCsv,
+  getBotResponse,
+  // CsvActionResponse,
+  // GptResponseCsv,
 } from '../service/response.js';
 import { generateSessionToken } from '../service/session.js';
 
@@ -13,6 +15,7 @@ export const Chats = async (req, res) => {
   try {
     const { userData, message, sessionId, summary, content, csvtext } =
       req.body;
+    // console.log(message, content, ':::::message and content');
 
     if (summary && userData.waId && userData.waProfile.name && !sessionId) {
       // create chatsesssion
@@ -71,33 +74,26 @@ export const Chats = async (req, res) => {
 
       const botMessage = await getBotResponse(chatSession.messages);
       const storedContent = chatSession.content;
-      console.log(storedContent, '::storedContenttttttttttt Array');
+      // console.log(storedContent, '::storedContenttttttttttt Array');
 
       await updateChatSession(chatSession._id, message, botMessage);
-      const { contents, response } = await CreateAction(
-        chatSession.messages,
+
+      const createActionresponse = await CreateAction(
         message,
-        content,
-        storedContent
-      );
-      const csvResponse = await CsvActionResponse(
-        message,
-        response,
-        contents,
+        storedContent,
         csvtext
       );
-       console.log('get CSV response: ', csvResponse);
-      console.log('end CSV---------------');
-      console.log(csvResponse, ':::csv response chat controller');
-      const newBotResponse = await GptResponseCsv(
-        message,
-        chatSession.messages,
-        csvResponse
-      );
 
-      return res
-        .status(200)
-        .json({ chatSession, csvResponse, botMessage, newBotResponse });
+      // const csvResponse = await CsvActionResponse(message, csvtext);
+      // console.log('get CSV response: ', csvResponse);
+      // // console.log('end CSV---------------');
+      // // console.log(csvResponse, ':::csv response chat controller');
+      // const newBotResponse = await GptResponseCsv(
+      //   message,
+      //   chatSession.messages
+      // );
+
+      return res.status(200).json({ chatSession, botMessage, createActionresponse });
     }
     return res.status(401).json({ message: 'Bad formed Request.' });
   } catch (err) {
