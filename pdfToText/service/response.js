@@ -5,6 +5,7 @@ import pkg from 'openai';
 export const { OpenAIApi, ChatOpenAI, Configuration, LANGUAGES, FAISS } = pkg;
 import Tesseract from 'tesseract.js';
 import { functions } from './Function.js';
+import { filterRows } from './Excel.js';
 // import { create } from 'domain';
 // import Chat from '../modal/Chats.js';
 const csv = require('csv-parser');
@@ -56,12 +57,6 @@ export const CreateAction = async (message, storedContent, csvtext) => {
       console.log(functionName, ':::functionName');
       console.log(functionArguments, ':::functionArguments');
 
-      // if (
-      //   functionName === 'row_to_select' ||
-      //   functionName === 'sum_of_column' ||
-      //   functionName === 'average_of_column' ||
-      //   functionName === 'row_to_select'
-      // ) {
       let result = await CsvActionResponse(
         message,
         functionArguments,
@@ -80,119 +75,6 @@ export const CreateAction = async (message, storedContent, csvtext) => {
     console.log('error in create Acction: ', error);
     throw error;
   }
-};
-
-export const filterRows = (rows, columnFilters) => {
-  if (
-    columnFilters.includes('>') ||
-    columnFilters.includes('<') ||
-    columnFilters.includes('=')
-  ) {
-    return filteredRowsWithOperator(rows, columnFilters);
-  } else {
-    return filteredRowsSimple(rows, columnFilters);
-  }
-};
-
-const filteredRowsSimple = (rows, columnFilters) => {
-  const filters = columnFilters.split(/ OR | or /);
-  const selectedRows = [];
-
-  filters.forEach((filter) => {
-    const [columnName, value] = filter.replace(/'/g, '').split('=');
-    const trimmedColumnName = columnName.trim().toLowerCase();
-    const trimmedRowValue = value.trim().toLowerCase();
-
-    const filteredRows = rows.filter((row) => {
-      const columnValue = row[trimmedColumnName].trim().toLowerCase();
-      return columnValue === trimmedRowValue;
-    });
-
-    selectedRows.push(...filteredRows);
-  });
-
-  return selectedRows;
-};
-
-const filteredRowsWithOperator = (rows, columnFilters) => {
-  const filters = columnFilters.split(/ OR | or /);
-  const selectedRows = [];
-
-  filters.forEach((filter) => {
-    const [columnName, filterValue] = filter.replace(/'/g, '').split(/[><=]/);
-    const operator = filter.replace(/[^><=]/g, '').trim();
-    const trimmedColumnName = columnName.trim().toLowerCase();
-    const trimmedRowValue = filterValue.trim().toLowerCase();
-
-    const filteredRows = rows.filter((row) => {
-      const columnValue = parseFloat(
-        row[trimmedColumnName].replace(/[^0-9.-]+/g, '')
-      );
-      if (!isNaN(columnValue)) {
-        switch (operator) {
-          case '>':
-            return columnValue > parseFloat(trimmedRowValue);
-          case '>=':
-            return columnValue >= parseFloat(trimmedRowValue);
-          case '<':
-            return columnValue < parseFloat(trimmedRowValue);
-          case '<=':
-            return columnValue <= parseFloat(trimmedRowValue);
-          case '=':
-            return columnValue === parseFloat(trimmedRowValue);
-          default:
-            return false;
-        }
-      }
-      return false;
-    });
-
-    selectedRows.push(...filteredRows);
-  });
-
-  return selectedRows;
-};
-
-export const filteredRows = (rows, columnFilters) => {
-  const filters = columnFilters.split(/ OR | or /);
-  const selectedRows = [];
-
-  filters.forEach((filter) => {
-    const [columnName, filterValue] = filter.replace(/'/g, '').split(/[><=]/);
-    const operator = filter.replace(/[^><=]/g, '').trim();
-    const trimmedColumnName = columnName.trim().toLowerCase();
-    const trimmedRowValue = filterValue.trim().toLowerCase();
-    console.log(trimmedColumnName, ':::trimmedColumnName');
-    console.log(operator, ':::operator');
-    console.log(trimmedRowValue, ':::trimmedRowValue');
-
-    const filteredRows = rows.filter((row) => {
-      const columnValue = parseFloat(
-        row[trimmedColumnName].replace(/[^0-9.-]+/g, '')
-      );
-      if (!isNaN(columnValue)) {
-        switch (operator) {
-          case '>':
-            return columnValue > parseFloat(trimmedRowValue);
-          case '>=':
-            return columnValue >= parseFloat(trimmedRowValue);
-          case '<':
-            return columnValue < parseFloat(trimmedRowValue);
-          case '<=':
-            return columnValue <= parseFloat(trimmedRowValue);
-          case '=':
-            return columnValue === parseFloat(trimmedRowValue);
-          default:
-            return false;
-        }
-      }
-      return false;
-    });
-
-    selectedRows.push(...filteredRows);
-  });
-
-  return selectedRows;
 };
 
 export const CsvActionResponse = async (
