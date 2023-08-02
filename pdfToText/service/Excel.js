@@ -18,13 +18,14 @@ export const filteredRowsSimple = (rows, columnFilters) => {
     const [filterColumnValue, filterRowValue] = filter
       .replace(/'/g, '')
       .split(/\s*=\s*/); // Split on '=' with optional spaces
-    const trimmedColumnName = filterColumnValue.trim().toLowerCase();
+      const trimmedColumnName = filterColumnValue.replace(/\s/g, '').toLowerCase();
     console.log(trimmedColumnName, 'trimmedColumnName simple value');
     const trimmedRowValue = filterRowValue.trim().toLowerCase();
     console.log(trimmedRowValue, 'trimmed row value');
 
     const filteredRows = rows.filter((row) => {
-      const columnValue = row[trimmedColumnName]?.trim().toLowerCase();
+      const columnValue = row[trimmedColumnName]?.trim().toLowerCase()
+      ;
       return columnValue === trimmedRowValue;
     });
 

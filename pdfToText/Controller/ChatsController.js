@@ -14,10 +14,10 @@ import { CreatepdfAction } from '../service/pdf.js';
 
 export const Chats = async (req, res) => {
   try {
-    const { userData, message, sessionId, summary, content, csvtext,text } =
+    const { userData, message, sessionId, summary, content, csvtext, text } =
       req.body;
 
-    if (summary && userData.waId && userData.waProfile.name && !sessionId) {  
+    if (summary && userData.waId && userData.waProfile.name && !sessionId) {
       // create chatsesssion
       const sessionToken = generateSessionToken();
       const chatSession = new Chat({ sessionToken, summary, content });
@@ -84,14 +84,16 @@ export const Chats = async (req, res) => {
         csvtext
       );
 
-   const createpdfresponse=await CreatepdfAction(
-    message,
-    storedContent,
-    text,
-    chatSession._id
-   )
+      //  const createpdfresponse=await CreatepdfAction(
+      //   message,
+      //   storedContent,
+      //   text,
+      //   chatSession._id
+      //  )
 
-      return res.status(200).json({ chatSession, botMessage, createActionresponse ,createpdfresponse});
+      return res
+        .status(200)
+        .json({ chatSession, botMessage, createActionresponse });
     }
     return res.status(401).json({ message: 'Bad formed Request.' });
   } catch (err) {
