@@ -34,11 +34,13 @@ export const getpdf2text = async (pdfUrl) => {
       const imageSrc = canvas.toDataURL('image/png');
       const pageText = await processImage(imageSrc);
       finalString += pageText + '\n\n';
+      console.log(finalString, ':::final string');
     }
 
-    return finalString;
+    return { success: true, text: finalString };
   } catch (error) {
     console.log('Error:', error);
+    return { success: false, error: error.message };
   }
 };
 

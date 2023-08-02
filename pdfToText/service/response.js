@@ -523,6 +523,7 @@ export const processImage = async (imageUrl) => {
   try {
     const { data } = await Tesseract.recognize(encodeURI(imageUrl), 'eng');
     const text = data.text;
+    console.log(text, ':::text');
     return text;
   } catch (error) {
     console.log('error', error);
