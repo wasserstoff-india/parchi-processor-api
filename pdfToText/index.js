@@ -9,7 +9,11 @@ import session from 'express-session';
 const app = express();
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-app.use(cors({ credentials: true }));
+app.use(
+  cors({
+    origin: '*',
+  })
+);
 
 app.use(
   session({
