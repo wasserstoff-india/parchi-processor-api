@@ -11,6 +11,9 @@ const chatSchema = new mongoose.Schema({
   content: {
     type: String,
   },
+  fileUrl: {
+    type: String,
+  },
   messages: [
     {
       sender: {

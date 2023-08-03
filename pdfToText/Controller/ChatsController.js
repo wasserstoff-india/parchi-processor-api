@@ -1,4 +1,5 @@
 import axios from 'axios';
+import path from 'path';
 import Chat from '../modal/Chats.js';
 import {
   CreateAction,
@@ -14,13 +15,24 @@ import { CreatepdfAction } from '../service/pdf.js';
 
 export const Chats = async (req, res) => {
   try {
-    const { userData, message, sessionId, summary, content, csvtext, text } =
-      req.body;
+    const {
+      userData,
+      message,
+      sessionId,
+      summary,
+      content,
+      csvtext,
+      text,
+      fileUrl,
+    } = req.body;
+    console.log(fileUrl, '::::fileurl');
+    const fileExtension = path.extname(fileUrl);
+    console.log(fileExtension, '::::fileExtension');
 
     if (summary && userData.waId && userData.waProfile.name && !sessionId) {
       // create chatsesssion
       const sessionToken = generateSessionToken();
-      const chatSession = new Chat({ sessionToken, summary, content });
+      const chatSession = new Chat({ sessionToken, summary, content, fileUrl });
       chatSession.messages.push(
         {
           sender: 'user',
@@ -76,24 +88,36 @@ export const Chats = async (req, res) => {
       const storedContent = chatSession.content;
       // console.log(storedContent, '::storedContenttttttttttt Array');
 
-      await updateChatSession(chatSession._id, message, botMessage);
+      await updateChatSession(chatSession._id, message, botMessage, fileUrl);
 
-      const createActionresponse = await CreateAction(
-        message,
-        storedContent,
-        csvtext
-      );
-
-      //  const createpdfresponse=await CreatepdfAction(
-      //   message,
-      //   storedContent,
-      //   text,
-      //   chatSession._id
-      //  )
-
-      return res
-        .status(200)
-        .json({ chatSession, botMessage, createActionresponse });
+      let createActionresponse, createpdfresponse;
+      if (fileExtension === '.pdf') {
+        console.log('goes in the create pdf response');
+        // If the file extension is '.pdf', call CreatepdfAction
+        createpdfresponse = await CreatepdfAction(
+          message,
+          storedContent,
+          text,
+          chatSession._id
+        );
+      } else if (fileExtension === '.csv' || fileExtension === '.xlsx') {
+        // If the file extension is '.csv' or '.xlsx', call CreateAction
+        console.log('goes in create action');
+        createActionresponse = await CreateAction(
+          message,
+          storedContent,
+          csvtext
+        );
+      } else {
+        // Handle the case when the file type is not recognized
+        throw new Error('Unsupported file type.');
+      }
+      return res.status(200).json({
+        chatSession,
+        botMessage,
+        createActionresponse,
+        createpdfresponse,
+      });
     }
     return res.status(401).json({ message: 'Bad formed Request.' });
   } catch (err) {
