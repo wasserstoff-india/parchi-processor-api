@@ -5,6 +5,9 @@ import { PORT, SECRETKEY } from './config/config.js';
 import router from './routes/index.js';
 import db from './config/mongoose.js';
 import session from 'express-session';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
 
 const app = express();
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -15,6 +18,11 @@ app.use(
   })
 );
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+app.use(express.static(__dirname + "/static"));
+
 app.use(
   session({
     secret: SECRETKEY,
@@ -22,6 +30,7 @@ app.use(
     saveUninitialized: false,
   })
 );
+
 
 app.use('/', router);
 
