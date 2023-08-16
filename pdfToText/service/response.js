@@ -11,7 +11,7 @@ export const getBotResponse = async (message) => {
   });
   try {
     const response = await openai.createChatCompletion({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-3.5-turbo-16k',
       messages: msgsArr,
     });
 
@@ -23,11 +23,21 @@ export const getBotResponse = async (message) => {
   }
 };
 
+
 export const getSummary = async (text) => {
+  // console.log(text, ':::::text body summary');
+  const lines = text.split('\n').slice(0, 30).join('\n');
+  console.log(lines, ':::::lines');
   try {
     const response = await openai.createCompletion({
       model: 'text-davinci-003',
-      prompt: 'Summarise the following text : ' + text + '\n\n',
+      prompt: `The following is a summary of the provided text:
+    
+      Text to summarize:
+      ${lines}
+      
+      Please provide a concise summary of the above text.
+    `
     });
     return response;
   } catch (err) {
