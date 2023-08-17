@@ -29,13 +29,13 @@ export const TextSplitter = async (text) => {
   console.log(text.length);
 
   try {
-    const fileDocs = await splitter.createDocuments([text], [], {});
+    const fileDocs = await splitter.createDocuments([text]);
 
     console.log(fileDocs, '::::fileDocs');
 
-    const textContent = fileDocs.map((doc) => doc.text).join(' ');
 
-    return textContent;
+
+    return fileDocs;
   } catch (error) {
     // Handle errors
     console.error('Error splitting text:', error);
@@ -90,28 +90,22 @@ export const saveEmbeddingsToPinecone = async (embeddingArray, id) => {
     console.error('Error saving embeddings to Pinecone:', error);
   }
 };
-const embeddings = new OpenAIEmbeddings({
-  openAIApiKey: 'YOUR-API-KEY', // In Node.js defaults to process.env.OPENAI_API_KEY
-});
+
 
 export const CreatepdfAction = async (message, storedContent, text, id) => {
   console.log(id, ':::id');
   const splitter = await TextSplitter(text);
   console.log(splitter, ':splitter');
   try {
-    const embeddings = new OpenAIEmbeddings({
-      openAIApiKey: CHATAPI, // In Node.js defaults to process.env.OPENAI_API_KEY
+   
+
+    const response = await openaiii.createEmbedding({
+      model: 'text-embedding-ada-002',
+      input: splitter, // Pass the array of strings here
     });
-    const embeddingArray = await embeddings.embedDocuments([splitter]);
-    console.log(embeddingArray, ':::::,embeddingArray');
 
-    // const response = await openaiii.createEmbedding({
-    //   model: 'text-embedding-ada-002',
-    //   input: splitter, // Pass the array of strings here
-    // });
-
-    // console.log(response.data?.data[0]?.embedding, ':::response');
-    // const embeddingArray = response.data?.data[0]?.embedding;
+    console.log(response.data?.data[0]?.embedding, ':::response');
+    const embeddingArray = response.data?.data[0]?.embedding;
     await saveEmbeddingsToPinecone(embeddingArray, id);
 
     return embeddingArray;
