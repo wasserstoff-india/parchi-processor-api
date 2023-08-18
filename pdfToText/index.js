@@ -10,12 +10,12 @@ const app = express();
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-const corsOptions ={
-  origin:'*', 
+// const corsOptions ={
+//   origin:'*', 
  
-}
+// }
 
-app.use(cors(corsOptions))
+app.use(cors())
 
 app.use(
   session({
