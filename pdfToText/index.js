@@ -11,7 +11,7 @@ import { dirname } from 'path';
 const app = express();
 app.use(
   cors({
-    origin: 'https://parchi.world',
+    origin: '*',
     
   })
 );
