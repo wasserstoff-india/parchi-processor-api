@@ -50,23 +50,6 @@ export const Chats = async (req, res) => {
       return res.status(200).json({ sessionId: sessionToken });
     }
 
-    //   chatSession.messages.push(
-    //     {
-    //       sender: 'user',
-    //       message:
-    //         'This is the summary you generated from a log text - ' +
-    //         summary +
-    //         '.\n\n Now I will Ask you questiones based on this summary. Act as a really supportive and inteligent assistant bot.',
-    //     },
-    //     {
-    //       sender: 'assistant',
-    //       message: 'Awesome. I got it. Shoot me questions.',
-    //     }
-    //   );
-    //   await chatSession.save();
-    //   return res.status(200).json({ sessionId: sessionToken });
-    // }
-
     if (sessionId && message) {
       const chatSession = await Chat.findOne({ sessionToken: sessionId });
 

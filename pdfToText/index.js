@@ -8,20 +8,20 @@ import session from 'express-session';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-
 const app = express();
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(
   cors({
-    origin: '*',
+    origin: 'https://parchi.world',
+    
   })
 );
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-app.use(express.static(__dirname + "/static"));
+app.use(express.static(__dirname + '/static'));
 
 app.use(
   session({
@@ -30,7 +30,6 @@ app.use(
     saveUninitialized: false,
   })
 );
-
 
 app.use('/', router);
 

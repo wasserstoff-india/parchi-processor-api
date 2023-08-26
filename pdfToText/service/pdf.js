@@ -13,12 +13,21 @@ import { PineconeStore } from 'langchain/vectorstores/pinecone';
 import pkg from 'openai';
 export const { OpenAIApi, ChatOpenAI, Configuration, LANGUAGES, FAISS } = pkg;
 
+const pinecone = new PineconeClient();
+await pinecone.init({
+  environment: 'us-east-1-aws',
+  apiKey: '31283199-8c91-49b6-9265-ea7d6a789a2b',
+});
+
+const indexName = 'parchii-wasserstoff'; // Set your desired index name
+
 export const conf = new Configuration({
   apiKey: CHATAPI,
 });
 
 const openaiii = new OpenAIApi(conf);
 
+// 1-splitiing text into chunks
 export const TextSplitter = async (text) => {
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 1000,
@@ -33,8 +42,6 @@ export const TextSplitter = async (text) => {
 
     console.log(fileDocs, '::::fileDocs');
 
-
-
     return fileDocs;
   } catch (error) {
     // Handle errors
@@ -42,73 +49,101 @@ export const TextSplitter = async (text) => {
     return null;
   }
 };
-export const saveEmbeddingsToPinecone = async (embeddingArray, id) => {
+
+export const CreatepdfAction = async (message, storedContent, text, id) => {
+  console.log(id, ':::id');
+  const chatSessionId = id.toString()
+  console.log(chatSessionId,":::input string")
+  const splitter = await TextSplitter(text);
+  const concatenatedText = splitter.map((doc) => doc.pageContent).join(' ');
   try {
-    // Use the Pinecone client and initialize it with your API key and environment
-    const pinecone = new PineconeClient();
-    await pinecone.init({
-      environment: 'us-west1-gcp-free',
-      apiKey: '4f1dc434-20da-4f1e-ac3c-a688b0250670',
+    const response = await openaiii.createEmbedding({
+      model: 'text-embedding-ada-002',
+      input: concatenatedText,
     });
-    const indexName = 'parchi-1';
 
-    pinecone.createIndex((metric = 'cosine'), (dimension = 1536));
-    // const batchSize = 250; // Set the desired batch size
+    console.log(response.data?.data[0]?.embedding, ':::response');
+    const embeddingArray = response.data?.data[0]?.embedding;
+    await saveEmbeddingsToPinecone(embeddingArray, chatSessionId);
+    await CreateUserEmbedding(message,chatSessionId);
+  } catch (error) {
+    // Handle errors
+    console.error('Error creating embeddings:', error);
+  }
+};
 
-    // // Create an array to store batches of vectors
-    // const batches = [];
+export const saveEmbeddingsToPinecone = async (embeddingArray, chatSessionId) => {
+  try {
+    // Check if the index already exists
+    const existingIndexes = await pinecone.listIndexes();
+    const indexExists = existingIndexes.includes(indexName);
 
-    // // Split the embeddingArray into batches
-    // for (let i = 0; i < embeddingArray.length; i += batchSize) {
-    //   const batch = embeddingArray.slice(i, i + batchSize).map((embedding) => ({
-    //     tag: id, // Use the provided id as the tag
-    //     vector: embedding,
-    //   }));
-    //   batches.push(batch);
-    // }
+   
 
-    // // Upsert each batch of vectors into the Pinecone index
+    // Create the index if it doesn't exist
+    if (!indexExists) {
+      const newIndex = await pinecone.createIndex({
+        createRequest: {
+          name: indexName,
+          dimension: 1536,
+          metadata_config : {
+            "indexed": ["chat_id"]
+        }
+        },
+      });
+      console.log(`Index created: ${newIndex}`);
+    }
+    // Get the index instance
     const pineconeIndex = pinecone.Index(indexName);
-    await pineconeIndex.upsert({
+    // Upsert the batch of vectors
+    const pineconeResult = await pineconeIndex.upsert({
       upsertRequest: {
-        id: id,
-        vectors: [embeddingArray],
-        namespace: 'parchi',
+        vectors: [
+          {
+            id: chatSessionId, // mongodb id
+            values: embeddingArray,
+            metadata:{
+              chat_id:chatSessionId
+            }
+          },
+        ],
       },
     });
-    // for (const batch of batches) {
-    //   await pineconeIndex.upsert({
-    //     upsertRequest: {
-    //       namespace: "parchi",
-    //       vectors: batch,
-    //     },
-    //   });
-    // }
 
-    console.log('Embeddings saved to Pinecone successfully.');
+    console.log('Batch of embeddings saved to Pinecone:', pineconeResult);
+
+    console.log('All embeddings saved to Pinecone successfully.');
   } catch (error) {
     console.error('Error saving embeddings to Pinecone:', error);
   }
 };
 
-
-export const CreatepdfAction = async (message, storedContent, text, id) => {
-  console.log(id, ':::id');
-  const splitter = await TextSplitter(text);
-  console.log(splitter, ':splitter');
+export const CreateUserEmbedding = async (message,chatSessionId) => {
+  console.log(message, '::message');
   try {
-   
-
     const response = await openaiii.createEmbedding({
       model: 'text-embedding-ada-002',
-      input: splitter, // Pass the array of strings here
+      input: message,
     });
 
     console.log(response.data?.data[0]?.embedding, ':::response');
-    const embeddingArray = response.data?.data[0]?.embedding;
-    await saveEmbeddingsToPinecone(embeddingArray, id);
+    const UserembeddingArray = response.data?.data[0]?.embedding;
 
-    return embeddingArray;
+    const pineconeIndex = pinecone.Index(indexName);
+
+    const queryResponse = await pineconeIndex.query({
+      queryRequest: {
+        vector: UserembeddingArray,
+        topK: 3,
+        includeMetadata:true,
+        filter:{
+          chat_id:{"$eq":chatSessionId}
+        }
+      }
+    })
+    console.log(queryResponse,":::query response")
+
+    return queryResponse;
   } catch (error) {
     // Handle errors
     console.error('Error creating embeddings:', error);
