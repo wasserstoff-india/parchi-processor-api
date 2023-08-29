@@ -1,17 +1,9 @@
 import axios from 'axios';
 import path from 'path';
 import Chat from '../modal/Chats.js';
-import {
-  CreateAction,
-  CsvActionResponse,
-  GptResponseCsv,
-  // CreateCsv,
-  getBotResponse,
-  // CsvActionResponse,
-  // GptResponseCsv,
-} from '../service/response.js';
+import { CreateAction, getBotResponse } from '../service/response.js';
 import { generateSessionToken } from '../service/session.js';
-import { CreatepdfAction } from '../service/pdf.js';
+import { CreatepdfAction, PineconeAction } from '../service/pdf.js';
 
 export const Chats = async (req, res) => {
   try {
@@ -31,6 +23,8 @@ export const Chats = async (req, res) => {
 
     if (summary && userData.waId && userData.waProfile.name && !sessionId) {
       // create chatsesssion
+      // 
+
       const sessionToken = generateSessionToken();
       const chatSession = new Chat({ sessionToken, summary, content, fileUrl });
       chatSession.messages.push(
@@ -47,7 +41,16 @@ export const Chats = async (req, res) => {
         }
       );
       await chatSession.save();
-      return res.status(200).json({ sessionId: sessionToken });
+      const lastChatSession = await Chat.findOne({}, {}, { sort: { _id: -1 } });
+
+      if (lastChatSession) {
+        const lastChatSessionId = lastChatSession._id;
+        
+        console.log('Last Chat Session ID:', lastChatSessionId);
+      } 
+      const PineconeStore = await PineconeAction(text,lastChatSession._id);
+      
+      return res.status(200).json({ sessionId: sessionToken,PineconeStore });
     }
 
     if (sessionId && message) {
@@ -67,30 +70,35 @@ export const Chats = async (req, res) => {
         ];
       }
 
-      const botMessage = await getBotResponse(chatSession.messages);
+      const 
+      botMessage = await getBotResponse(chatSession.messages);
       const storedContent = chatSession.content;
-      // console.log(storedContent, '::storedContenttttttttttt Array');
-
+      
       await updateChatSession(chatSession._id, message, botMessage, fileUrl);
 
+     
       let createActionresponse, createpdfresponse;
+    
       if (fileExtension === '.pdf') {
         console.log('goes in the create pdf response');
         // If the file extension is '.pdf', call CreatepdfAction
         createpdfresponse = await CreatepdfAction(
           message,
+          chatSession._id,
           storedContent,
           text,
-          chatSession._id
+        
         );
+       
       } else if (fileExtension === '.csv' || fileExtension === '.xlsx') {
         // If the file extension is '.csv' or '.xlsx', call CreateAction
         console.log('goes in create action');
         createActionresponse = await CreateAction(
           message,
           storedContent,
-          csvtext
+          csvtext   
         );
+      
       } else {
         // Handle the case when the file type is not recognized
         throw new Error('Unsupported file type.');
@@ -98,8 +106,7 @@ export const Chats = async (req, res) => {
       return res.status(200).json({
         chatSession,
         botMessage,
-        createActionresponse,
-        createpdfresponse,
+        createpdfresponse
       });
     }
     return res.status(401).json({ message: 'Bad formed Request.' });

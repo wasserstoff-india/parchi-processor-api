@@ -21,7 +21,7 @@ export const CreateCsv = async (text) => {
   try {
     const prompt = `I am providing you first five rows of a csv file which includes first row as header row. Your task is to analyze the rows and create a schema for the table. Schema should be in format : \n\n SCHEMA(TABLE_NAME:<table name> \n COLUMNS:[<column name, column type>] \n SUMMARY:<Description of the table about what it contains>). Reply only with the schema, and nothing else. Following are the first five rows \n\n ${text}`;
     const gptResponse = await openaiii.createChatCompletion({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-3.5-turbo-16k-0613',
       messages: [{ role: 'system', content: prompt }],
     });
 
